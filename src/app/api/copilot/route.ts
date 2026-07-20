@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrice, get24hTicker } from "@/lib/binance";
+import { getPrice, get24hTicker, getFallbackPrice } from "@/lib/binance";
 
 export async function POST(req: NextRequest) {
   const { message } = await req.json();
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     price = p;
     change24h = parseFloat(ticker.priceChangePercent);
   } catch {
-    price = 94832.5;
+    price = getFallbackPrice(symbol);
     change24h = 1.2;
   }
 

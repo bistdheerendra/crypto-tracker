@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getKlines, getPrice } from "@/lib/binance";
+import { getKlines, getPrice, getFallbackPrice } from "@/lib/binance";
 import {
   runTechnicalLane,
   runFlowLane,
@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ lanes, verdict, price });
   } catch {
-    const price = 94832.5;
-    const atr = 1200;
+    const price = getFallbackPrice(pair);
+    const atr = price * 0.02;
     const closes = Array.from({ length: 200 }, (_, i) => price - 2000 + i * 15);
     const highs = closes.map((c) => c + 100);
     const lows = closes.map((c) => c - 100);
