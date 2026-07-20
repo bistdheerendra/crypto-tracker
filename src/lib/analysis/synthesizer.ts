@@ -1,6 +1,10 @@
 import type { Bias, Direction, LaneOutput, Tier, Verdict } from "../types";
 import { computeATR } from "../binance";
 import { getDynamicLaneWeights } from "../backtest/lane-weights";
+import type { FlowMetrics } from "../binance-futures";
+import type { MacroSnapshot } from "../macro";
+import type { NarrativeSnapshot } from "../narrative";
+import { computeStructureLevels, computeSwingLevels } from "./structure";
 
 const BIAS_SCORE: Record<Bias, number> = {
   BULL: 1,
@@ -19,7 +23,9 @@ export function synthesizeVerdict(
   pair: string,
   timeframe: string,
   price: number,
-  atr: number
+  atr: number,
+  highs: number[],
+  lows: number[]
 ): Verdict {
   let score = 0;
   let totalWeight = 0;
@@ -49,13 +55,10 @@ export function synthesizeVerdict(
     tier = "MODERATE";
   }
 
-  const isLong = direction === "LONG";
-  const isShort = direction === "SHORT";
-  const sl = isLong ? price - atr * 1.5 : isShort ? price + atr * 1.5 : price;
-  const tp1 = isLong ? price + atr * 2 : isShort ? price - atr * 2 : price;
-  const tp2 = isLong ? price + atr * 3.5 : isShort ? price - atr * 3.5 : price;
-  const risk = Math.abs(price - sl);
-  const reward = Math.abs(tp1 - price);
+  const swings = computeSwingLevels(highs, lows);
+  const levels = computeStructureLevels(direction, price, atr, swings);
+  const risk = Math.abs(price - levels.stopLoss);
+  const reward = Math.abs(levels.takeProfit1 - price);
   const rr = risk > 0 ? (reward / risk).toFixed(1) : "—";
 
   return {
@@ -65,10 +68,10 @@ export function synthesizeVerdict(
     direction,
     alignment: `${aligned}/4 lanes aligned`,
     entry: price,
-    stopLoss: sl,
-    takeProfit1: tp1,
-    takeProfit2: tp2,
-    rationale: buildRationale(lanes, direction),
+    stopLoss: parseFloat(levels.stopLoss.toFixed(2)),
+    takeProfit1: parseFloat(levels.takeProfit1.toFixed(2)),
+    takeProfit2: parseFloat(levels.takeProfit2.toFixed(2)),
+    rationale: buildRationale(lanes, direction, levels.slSource),
     riskReward: `1:${rr}`,
   };
 }
@@ -81,14 +84,23 @@ function getDominantBias(lanes: LaneOutput[]): Bias {
   return "MIXED";
 }
 
-function buildRationale(lanes: LaneOutput[], direction: Direction): string {
+function buildRationale(
+  lanes: LaneOutput[],
+  direction: Direction,
+  slSource: "structure" | "atr"
+): string {
   const bullish = lanes.filter((l) => l.bias === "BULL").map((l) => l.lane);
   const bearish = lanes.filter((l) => l.bias === "BEAR").map((l) => l.lane);
+  const slNote =
+    slSource === "structure"
+      ? "Stop anchored to recent swing structure."
+      : "Stop capped by ATR risk limits.";
+
   if (direction === "LONG") {
-    return `${bullish.join(" + ")} lanes support upside; macro headwinds noted but outweighed.`;
+    return `${bullish.join(" + ")} lanes support upside. ${slNote}`;
   }
   if (direction === "SHORT") {
-    return `${bearish.join(" + ")} lanes flag downside risk; technical support may limit depth.`;
+    return `${bearish.join(" + ")} lanes flag downside risk. ${slNote}`;
   }
   return "Lanes diverge — wait for alignment before sizing a position.";
 }
@@ -104,6 +116,7 @@ export function runTechnicalLane(
   const price = closes[closes.length - 1];
   const bullish = price > ema50 && ema50 > ema200;
   const bearish = price < ema50 && ema50 < ema200;
+  const swings = computeSwingLevels(highs, lows);
 
   return {
     lane: "Technical",
@@ -113,54 +126,159 @@ export function runTechnicalLane(
     reasoning: [
       `Price ${bullish ? "above" : bearish ? "below" : "near"} 50/200 EMA`,
       `RSI(14) at ${rsi.toFixed(0)}`,
-      `Support at ${Math.min(...lows.slice(-20)).toFixed(2)}`,
+      `Swing support ${swings.swingLow.toFixed(2)}, resistance ${swings.swingHigh.toFixed(2)}`,
     ],
   };
 }
 
-export function runFlowLane(): LaneOutput {
-  const oiChange = (Math.random() * 8 - 2).toFixed(1);
-  const funding = (Math.random() * 0.02).toFixed(4);
-  const ratio = (1 + Math.random() * 0.4).toFixed(2);
-  const bullish = parseFloat(oiChange) > 0;
+export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneOutput {
+  if (!flow.available) {
+    return {
+      lane: "Flow",
+      badge: "F",
+      bias: "MIXED",
+      tier: "LOW",
+      reasoning: ["Futures flow data unavailable for this pair"],
+    };
+  }
+
+  const oiUp = flow.oiChange24hPct > 0;
+  const priceUp = priceChange24hPct > 0;
+  const crowdedLongs = flow.fundingRate > 0.03;
+  const crowdedShorts = flow.fundingRate < -0.03;
+
+  let bias: Bias = "MIXED";
+  if (oiUp && priceUp && !crowdedLongs) bias = "BULL";
+  else if (oiUp && !priceUp) bias = "BEAR";
+  else if (!oiUp && priceUp) bias = "BULL";
+  else if (crowdedLongs) bias = "BEAR";
+  else if (crowdedShorts) bias = "BULL";
+
+  const tier: Tier =
+    Math.abs(flow.oiChange24hPct) > 5 || Math.abs(flow.fundingRate) > 0.05
+      ? "HIGH"
+      : "MODERATE";
 
   return {
     lane: "Flow",
     badge: "F",
-    bias: bullish ? "BULL" : "BEAR",
-    tier: Math.abs(parseFloat(oiChange)) > 3 ? "HIGH" : "MODERATE",
+    bias,
+    tier,
     reasoning: [
-      `OI ${parseFloat(oiChange) > 0 ? "+" : ""}${oiChange}% in 24h`,
-      `Funding rate ${funding}%`,
-      `Long/short ratio ${ratio}`,
+      `OI ${flow.oiChange24hPct >= 0 ? "+" : ""}${flow.oiChange24hPct.toFixed(1)}% (24h)`,
+      `Funding ${flow.fundingRate.toFixed(4)}%`,
+      `Long/short ratio ${flow.longShortRatio.toFixed(2)}`,
     ],
   };
 }
 
-export function runNarrativeLane(): LaneOutput {
+export function runNarrativeLane(narrative: NarrativeSnapshot): LaneOutput {
+  if (!narrative.available) {
+    return {
+      lane: "Narrative",
+      badge: "N",
+      bias: "MIXED",
+      tier: "LOW",
+      reasoning: ["Narrative data sources unavailable"],
+    };
+  }
+
+  let bullPoints = 0;
+  let bearPoints = 0;
+
+  if (narrative.fearGreed != null) {
+    if (narrative.fearGreed >= 60) bullPoints += 1;
+    else if (narrative.fearGreed <= 40) bearPoints += 1;
+  }
+  if (narrative.globalMarketCapChange24hPct != null) {
+    if (narrative.globalMarketCapChange24hPct > 1) bullPoints += 1;
+    else if (narrative.globalMarketCapChange24hPct < -1) bearPoints += 1;
+  }
+  if (narrative.priceChange24hPct > 2) bullPoints += 1;
+  else if (narrative.priceChange24hPct < -2) bearPoints += 1;
+
+  let bias: Bias = "MIXED";
+  if (bullPoints > bearPoints) bias = "BULL";
+  else if (bearPoints > bullPoints) bias = "BEAR";
+
+  const tier: Tier =
+    narrative.fearGreed != null && (narrative.fearGreed >= 75 || narrative.fearGreed <= 25)
+      ? "HIGH"
+      : "MODERATE";
+
+  const reasoning: string[] = [];
+  if (narrative.fearGreed != null) {
+    reasoning.push(
+      `Fear & Greed ${narrative.fearGreed} (${narrative.fearGreedLabel ?? "index"})`
+    );
+  }
+  if (narrative.globalMarketCapChange24hPct != null) {
+    reasoning.push(
+      `Global mcap ${narrative.globalMarketCapChange24hPct >= 0 ? "+" : ""}${narrative.globalMarketCapChange24hPct.toFixed(1)}% (24h)`
+    );
+  }
+  reasoning.push(
+    `${narrative.priceChange24hPct >= 0 ? "+" : ""}${narrative.priceChange24hPct.toFixed(1)}% on ${narrative.volume24h > 0 ? "elevated" : "light"} volume`
+  );
+  if (narrative.trendingCoins.length > 0) {
+    reasoning.push(`Trending: ${narrative.trendingCoins.join(", ")}`);
+  }
+
   return {
     lane: "Narrative",
     badge: "N",
-    bias: "MIXED",
-    tier: "MODERATE",
-    reasoning: [
-      "ETF inflows positive but slowing",
-      "Fed rhetoric hawkish-leaning",
-      "Social sentiment 62% bullish",
-    ],
+    bias,
+    tier,
+    reasoning: reasoning.slice(0, 3),
   };
 }
 
-export function runMacroLane(): LaneOutput {
+export function runMacroLane(macro: MacroSnapshot): LaneOutput {
+  if (!macro.available) {
+    return {
+      lane: "Macro",
+      badge: "M",
+      bias: "MIXED",
+      tier: "LOW",
+      reasoning: ["Macro market data unavailable"],
+    };
+  }
+
+  let riskOffScore = 0;
+  let riskOnScore = 0;
+
+  if (macro.dxyChange24hPct != null) {
+    if (macro.dxyChange24hPct > 0.15) riskOffScore += 1;
+    else if (macro.dxyChange24hPct < -0.15) riskOnScore += 1;
+  }
+  if (macro.spxChange24hPct != null) {
+    if (macro.spxChange24hPct > 0.3) riskOnScore += 1;
+    else if (macro.spxChange24hPct < -0.3) riskOffScore += 1;
+  }
+  if (macro.goldChange24hPct != null) {
+    if (macro.goldChange24hPct > 0.3) riskOffScore += 1;
+    else if (macro.goldChange24hPct < -0.3) riskOnScore += 1;
+  }
+
+  let bias: Bias = "MIXED";
+  if (riskOnScore > riskOffScore) bias = "BULL";
+  else if (riskOffScore > riskOnScore) bias = "BEAR";
+
+  const tier: Tier =
+    Math.abs(riskOnScore - riskOffScore) >= 2 ? "HIGH" : "MODERATE";
+
+  const fmt = (v: number | null) =>
+    v == null ? "n/a" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
   return {
     lane: "Macro",
     badge: "M",
-    bias: "BEAR",
-    tier: "LOW",
+    bias,
+    tier,
     reasoning: [
-      "DXY strengthening +0.3%",
-      "S&P 500 flat — risk-off undertone",
-      "Gold +0.8% — hedge demand rising",
+      `DXY ${fmt(macro.dxyChange24hPct)}`,
+      `S&P 500 ${fmt(macro.spxChange24hPct)}`,
+      `Gold ${fmt(macro.goldChange24hPct)}`,
     ],
   };
 }

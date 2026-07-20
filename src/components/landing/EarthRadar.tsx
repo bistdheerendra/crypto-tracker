@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { MOCK_NEWS } from "@/lib/mock-data";
+import { useRadarFeed } from "@/components/radar/useRadarFeed";
 import type { NewsItem } from "@/lib/types";
 
 const sentimentColors = {
@@ -55,17 +54,7 @@ function GlobeSVG({ dots }: { dots: NewsItem[] }) {
 }
 
 export function EarthRadar() {
-  const [news, setNews] = useState(MOCK_NEWS);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNews((prev) => {
-        const rotated = [...prev.slice(1), { ...prev[0], timeAgo: "just now" }];
-        return rotated;
-      });
-    }, 8000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: news, loading, error } = useRadarFeed<NewsItem>("news", 60_000);
 
   return (
     <section id="radar" className="py-16 sm:py-24 px-4 sm:px-6">
@@ -74,18 +63,34 @@ export function EarthRadar() {
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Earth Radar</p>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Live geolocated signals</h2>
           <p className="text-text-muted max-w-xl mb-8 sm:mb-12">
-            Crypto news events mapped to their origin. Each pulse connects to our analysis pipeline.
+            Crypto news from CoinDesk, CoinTelegraph, and Decrypt — refreshed every 60 seconds.
           </p>
         </ScrollReveal>
 
+        {error && (
+          <GlassCard className="mb-6 !p-4">
+            <p className="text-sm text-bear">{error}</p>
+          </GlassCard>
+        )}
+
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <ScrollReveal delay={0.1}>
-            <GlobeSVG dots={news} />
+            <GlobeSVG dots={news.slice(0, 8)} />
           </ScrollReveal>
 
           <ScrollReveal delay={0.2}>
             <div className="space-y-3">
-              {news.map((item) => (
+              {loading && (
+                <GlassCard className="!p-4">
+                  <p className="text-sm text-text-muted skeleton h-16" />
+                </GlassCard>
+              )}
+              {!loading && news.length === 0 && (
+                <GlassCard className="!p-4">
+                  <p className="text-sm text-text-muted">No live news available.</p>
+                </GlassCard>
+              )}
+              {news.slice(0, 6).map((item) => (
                 <GlassCard key={item.id} className="!p-4 hover:border-accent/20 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
                     <span className="text-xs text-text-muted font-mono-data">
@@ -101,7 +106,6 @@ export function EarthRadar() {
                   <div className="flex items-center gap-3 text-xs text-text-muted">
                     <span className="px-2 py-0.5 bg-white/5">{item.source}</span>
                     <span className="px-2 py-0.5 bg-white/5">{item.marketTag}</span>
-                    <span className="text-accent font-mono-data">{item.connected} connected</span>
                   </div>
                 </GlassCard>
               ))}

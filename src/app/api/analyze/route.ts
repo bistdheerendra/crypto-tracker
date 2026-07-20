@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getKlines, getPrice, getFallbackPrice } from "@/lib/binance";
+import { getKlines, getPrice, computeATR } from "@/lib/binance";
+import { getFlowMetrics } from "@/lib/binance-futures";
+import { getMacroSnapshot } from "@/lib/macro";
+import { getNarrativeSnapshot } from "@/lib/narrative";
 import {
   runTechnicalLane,
   runFlowLane,
   runNarrativeLane,
   runMacroLane,
   synthesizeVerdict,
-  computeATR,
 } from "@/lib/analysis/synthesizer";
 import { invalidateCache } from "@/lib/backtest/cache";
 import { invalidateLaneWeightCache } from "@/lib/backtest/lane-weights";
@@ -26,10 +28,24 @@ export async function GET(req: NextRequest) {
   const timeframe = req.nextUrl.searchParams.get("timeframe") || "1h";
 
   try {
-    const [klines, price] = await Promise.all([
+    const [klines, price, flowResult, narrativeResult, macroResult] = await Promise.all([
       getKlines(pair, timeframe, 200),
       getPrice(pair),
+      getFlowMetrics(pair),
+      getNarrativeSnapshot(pair),
+      getMacroSnapshot(),
     ]);
+
+    const flow = flowResult;
+    const narrative = narrativeResult;
+    const macro = macroResult;
+
+    if (!klines.length) {
+      return NextResponse.json(
+        { error: "Insufficient market data for analysis." },
+        { status: 503 }
+      );
+    }
 
     const closes = klines.map((k) => parseFloat(String(k[4])));
     const highs = klines.map((k) => parseFloat(String(k[2])));
@@ -38,30 +54,29 @@ export async function GET(req: NextRequest) {
 
     const lanes = [
       runTechnicalLane(closes, highs, lows),
-      runFlowLane(),
-      runNarrativeLane(),
-      runMacroLane(),
+      runFlowLane(flow, narrative.priceChange24hPct),
+      runNarrativeLane(narrative),
+      runMacroLane(macro),
     ];
 
-    const verdict = synthesizeVerdict(lanes, pair, timeframe, price, atr);
+    const verdict = synthesizeVerdict(lanes, pair, timeframe, price, atr, highs, lows);
     persistVerdict(verdict, lanes);
 
-    return NextResponse.json({ lanes, verdict, price });
-  } catch {
-    const price = getFallbackPrice(pair);
-    const atr = price * 0.02;
-    const closes = Array.from({ length: 200 }, (_, i) => price - 2000 + i * 15);
-    const highs = closes.map((c) => c + 100);
-    const lows = closes.map((c) => c - 100);
-
-    const lanes = [
-      runTechnicalLane(closes, highs, lows),
-      runFlowLane(),
-      runNarrativeLane(),
-      runMacroLane(),
-    ];
-    const verdict = synthesizeVerdict(lanes, pair, timeframe, price, atr);
-    persistVerdict(verdict, lanes);
-    return NextResponse.json({ lanes, verdict, price, mock: true });
+    return NextResponse.json({
+      lanes,
+      verdict,
+      price,
+      dataSources: {
+        klines: "binance",
+        price: "binance",
+        flow: flow.available ? "binance-futures" : "unavailable",
+        narrative: narrative.available ? "alternative.me+coingecko+binance" : "unavailable",
+        macro: macro.available ? "yahoo-finance" : "unavailable",
+        stopLoss: "swing-structure",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Analysis failed";
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }

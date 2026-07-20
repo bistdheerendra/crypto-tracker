@@ -301,3 +301,36 @@ export const CORRELATION_MATRIX: Record<string, number> = {
   "XRP/USDT": 0.71,
   "PAXG/USDT": -0.35,
 };
+
+export const MOCK_PORTFOLIO_POSITIONS = [
+  {
+    id: "pos-btc",
+    pair: "BTC/USDT",
+    side: "LONG" as const,
+    size: 0.5,
+    sizeUnit: "base" as const,
+    entry: 95_000,
+    stopLoss: 92_000,
+    markPrice: 94_800,
+  },
+  {
+    id: "pos-eth",
+    pair: "ETH/USDT",
+    side: "LONG" as const,
+    size: 10,
+    sizeUnit: "base" as const,
+    entry: 3_200,
+    stopLoss: 3_050,
+    markPrice: 3_180,
+  },
+  {
+    id: "pos-sol",
+    pair: "SOL/USDT",
+    side: "SHORT" as const,
+    size: 50,
+    sizeUnit: "base" as const,
+    entry: 145,
+    stopLoss: 155,
+    markPrice: 148,
+  },
+];

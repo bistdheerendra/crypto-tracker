@@ -20,17 +20,26 @@ export default function AnalyzePage() {
   const [lanes, setLanes] = useState<LaneOutput[]>([]);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function runAnalysis() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`);
       const data = await res.json();
+      if (!res.ok) {
+        setLanes([]);
+        setVerdict(null);
+        setError(data.error ?? "Analysis failed.");
+        return;
+      }
       setLanes(data.lanes);
       setVerdict(data.verdict);
     } catch {
       setLanes([]);
       setVerdict(null);
+      setError("Could not reach analysis service.");
     }
     setLoading(false);
   }
@@ -79,6 +88,12 @@ export default function AnalyzePage() {
           </button>
         </div>
       </GlassCard>
+
+      {error && (
+        <GlassCard className="mb-6 border-bear/30 !p-4">
+          <p className="text-sm text-bear">{error}</p>
+        </GlassCard>
+      )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {lanes.map((lane) => (

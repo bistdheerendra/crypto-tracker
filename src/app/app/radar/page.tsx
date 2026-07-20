@@ -2,17 +2,32 @@
 
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { MOCK_WHALES, MOCK_ETF_FLOWS, MOCK_LIQUIDATIONS } from "@/lib/mock-data";
+import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import type { ETFFlow, Liquidation, WhaleTransaction } from "@/lib/types";
 
 const TABS = ["Whales", "ETF Flows", "Liquidations"] as const;
 
+const TAB_TYPE: Record<(typeof TABS)[number], string> = {
+  Whales: "whales",
+  "ETF Flows": "etf",
+  Liquidations: "liquidations",
+};
+
 export default function RadarPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Whales");
+  const whales = useRadarFeed<WhaleTransaction>("whales", 120_000);
+  const etf = useRadarFeed<ETFFlow>("etf", 300_000);
+  const liquidations = useRadarFeed<Liquidation>("liquidations", 30_000);
+
+  const active =
+    activeTab === "Whales" ? whales : activeTab === "ETF Flows" ? etf : liquidations;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <h1 className="text-xl sm:text-2xl font-bold mb-1">Institutional Radar</h1>
-      <p className="text-text-muted text-sm mb-6 sm:mb-8">Whale movements, ETF flows, and liquidation events.</p>
+      <p className="text-text-muted text-sm mb-6 sm:mb-8">
+        Whale movements, ETF activity, and liquidation events from live APIs.
+      </p>
 
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
         {TABS.map((tab) => (
@@ -30,9 +45,19 @@ export default function RadarPage() {
         ))}
       </div>
 
+      {active.error && (
+        <GlassCard className="mb-4 !p-3">
+          <p className="text-sm text-bear">{active.error}</p>
+        </GlassCard>
+      )}
+
       <GlassCard className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          {activeTab === "Whales" && (
+          {active.loading && (
+            <p className="text-sm text-text-muted p-6 skeleton h-32" />
+          )}
+
+          {!active.loading && activeTab === "Whales" && (
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
@@ -45,48 +70,64 @@ export default function RadarPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_WHALES.map((w) => (
-                  <tr key={w.id} className="border-t border-white/5 hover:bg-white/3">
-                    <td className="py-3 px-4 font-mono-data text-xs">{w.address}</td>
-                    <td className="py-3 px-4">{w.chain}</td>
-                    <td className="py-3 px-4 font-mono-data">{w.amount}</td>
-                    <td className="py-3 px-4 font-mono-data">{w.usdValue}</td>
-                    <td className={`py-3 px-4 font-mono-data font-semibold ${w.direction === "in" ? "text-bull" : "text-bear"}`}>
-                      {w.direction.toUpperCase()}
+                {whales.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-6 px-4 text-center text-text-muted">
+                      No whale transactions found.
                     </td>
-                    <td className="py-3 px-4 text-text-muted">{w.timeAgo}</td>
                   </tr>
-                ))}
+                ) : (
+                  whales.data.map((w) => (
+                    <tr key={w.id} className="border-t border-white/5 hover:bg-white/3">
+                      <td className="py-3 px-4 font-mono-data text-xs">{w.address}</td>
+                      <td className="py-3 px-4">{w.chain}</td>
+                      <td className="py-3 px-4 font-mono-data">{w.amount}</td>
+                      <td className="py-3 px-4 font-mono-data">{w.usdValue}</td>
+                      <td className={`py-3 px-4 font-mono-data font-semibold ${w.direction === "in" ? "text-bull" : "text-bear"}`}>
+                        {w.direction.toUpperCase()}
+                      </td>
+                      <td className="py-3 px-4 text-text-muted">{w.timeAgo}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
 
-          {activeTab === "ETF Flows" && (
+          {!active.loading && activeTab === "ETF Flows" && (
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Ticker</th>
                   <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-right py-3 px-4">Net Flow ($M)</th>
+                  <th className="text-right py-3 px-4">Activity ($M)</th>
                   <th className="text-left py-3 px-4">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {MOCK_ETF_FLOWS.map((e) => (
-                  <tr key={e.ticker} className="border-t border-white/5 hover:bg-white/3">
-                    <td className="py-3 px-4 font-mono-data font-semibold">{e.ticker}</td>
-                    <td className="py-3 px-4 text-text-muted">{e.name}</td>
-                    <td className={`py-3 px-4 font-mono-data text-right font-semibold ${e.netFlow >= 0 ? "text-bull" : "text-bear"}`}>
-                      {e.netFlow >= 0 ? "+" : ""}{e.netFlow.toFixed(1)}
+                {etf.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 px-4 text-center text-text-muted">
+                      No ETF data available.
                     </td>
-                    <td className="py-3 px-4 text-text-muted">{e.date}</td>
                   </tr>
-                ))}
+                ) : (
+                  etf.data.map((e) => (
+                    <tr key={e.ticker} className="border-t border-white/5 hover:bg-white/3">
+                      <td className="py-3 px-4 font-mono-data font-semibold">{e.ticker}</td>
+                      <td className="py-3 px-4 text-text-muted">{e.name}</td>
+                      <td className={`py-3 px-4 font-mono-data text-right font-semibold ${e.netFlow >= 0 ? "text-bull" : "text-bear"}`}>
+                        {e.netFlow >= 0 ? "+" : ""}{e.netFlow.toFixed(1)}
+                      </td>
+                      <td className="py-3 px-4 text-text-muted">{e.date}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
 
-          {activeTab === "Liquidations" && (
+          {!active.loading && activeTab === "Liquidations" && (
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
@@ -98,20 +139,32 @@ export default function RadarPage() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_LIQUIDATIONS.map((l) => (
-                  <tr key={l.id} className="border-t border-white/5 hover:bg-white/3">
-                    <td className="py-3 px-4">{l.exchange}</td>
-                    <td className="py-3 px-4 font-mono-data">{l.pair}</td>
-                    <td className={`py-3 px-4 font-mono-data ${l.side === "long" ? "text-bear" : "text-bull"}`}>{l.side}</td>
-                    <td className="py-3 px-4 font-mono-data text-right">{l.amount}</td>
-                    <td className="py-3 px-4 text-text-muted">{l.timeAgo}</td>
+                {liquidations.data.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 px-4 text-center text-text-muted">
+                      No recent liquidations found.
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  liquidations.data.map((l) => (
+                    <tr key={l.id} className="border-t border-white/5 hover:bg-white/3">
+                      <td className="py-3 px-4">{l.exchange}</td>
+                      <td className="py-3 px-4 font-mono-data">{l.pair}</td>
+                      <td className={`py-3 px-4 font-mono-data ${l.side === "long" ? "text-bear" : "text-bull"}`}>{l.side}</td>
+                      <td className="py-3 px-4 font-mono-data text-right">{l.amount}</td>
+                      <td className="py-3 px-4 text-text-muted">{l.timeAgo}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           )}
         </div>
       </GlassCard>
+
+      <p className="text-xs text-text-muted mt-3">
+        Source: {TAB_TYPE[activeTab]} via live API · auto-refreshes
+      </p>
     </div>
   );
 }

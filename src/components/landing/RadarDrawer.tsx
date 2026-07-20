@@ -3,12 +3,19 @@
 import { useState } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { MOCK_WHALES, MOCK_ETF_FLOWS, MOCK_LIQUIDATIONS } from "@/lib/mock-data";
+import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import type { ETFFlow, Liquidation, NewsItem, WhaleTransaction } from "@/lib/types";
 
 const TABS = ["Whales", "ETF Flows", "Liquidations", "Scenarios"] as const;
 
 export function RadarDrawer() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Whales");
+  const whales = useRadarFeed<WhaleTransaction>("whales", 120_000);
+  const etf = useRadarFeed<ETFFlow>("etf", 300_000);
+  const liquidations = useRadarFeed<Liquidation>("liquidations", 30_000);
+
+  const active =
+    activeTab === "Whales" ? whales : activeTab === "ETF Flows" ? etf : liquidations;
 
   return (
     <section id="drawer" className="py-16 sm:py-24 px-4 sm:px-6 bg-bg-secondary/50">
@@ -17,7 +24,7 @@ export function RadarDrawer() {
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Institutional Radar</p>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Whales, flows & liquidations</h2>
           <p className="text-text-muted mb-8">
-            Deep institutional data in a slide-up drawer. Four tabs, zero noise.
+            Live institutional data from Blockchair, Yahoo Finance, and OKX.
           </p>
         </ScrollReveal>
 
@@ -40,7 +47,15 @@ export function RadarDrawer() {
             </div>
 
             <div className="p-3 sm:p-4 overflow-x-auto">
-              {activeTab === "Whales" && (
+              {activeTab !== "Scenarios" && active.error && (
+                <p className="text-sm text-bear mb-3 px-3">{active.error}</p>
+              )}
+
+              {activeTab !== "Scenarios" && active.loading && (
+                <p className="text-sm text-text-muted p-4 skeleton h-24" />
+              )}
+
+              {activeTab === "Whales" && !whales.loading && (
                 <table className="w-full text-sm min-w-[520px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
@@ -52,7 +67,7 @@ export function RadarDrawer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_WHALES.map((w) => (
+                    {whales.data.map((w) => (
                       <tr key={w.id} className="border-t border-white/5 hover:bg-white/3">
                         <td className="py-2.5 px-3 font-mono-data text-xs">{w.address}</td>
                         <td className="py-2.5 px-3 font-mono-data">{w.amount}</td>
@@ -67,17 +82,17 @@ export function RadarDrawer() {
                 </table>
               )}
 
-              {activeTab === "ETF Flows" && (
+              {activeTab === "ETF Flows" && !etf.loading && (
                 <table className="w-full text-sm min-w-[400px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Ticker</th>
                       <th className="text-left py-2 px-3">Name</th>
-                      <th className="text-right py-2 px-3">Net Flow ($M)</th>
+                      <th className="text-right py-2 px-3">Activity ($M)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_ETF_FLOWS.map((e) => (
+                    {etf.data.map((e) => (
                       <tr key={e.ticker} className="border-t border-white/5 hover:bg-white/3">
                         <td className="py-2.5 px-3 font-mono-data font-semibold">{e.ticker}</td>
                         <td className="py-2.5 px-3 text-text-muted">{e.name}</td>
@@ -90,7 +105,7 @@ export function RadarDrawer() {
                 </table>
               )}
 
-              {activeTab === "Liquidations" && (
+              {activeTab === "Liquidations" && !liquidations.loading && (
                 <table className="w-full text-sm min-w-[480px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
@@ -102,7 +117,7 @@ export function RadarDrawer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_LIQUIDATIONS.map((l) => (
+                    {liquidations.data.map((l) => (
                       <tr key={l.id} className="border-t border-white/5 hover:bg-white/3">
                         <td className="py-2.5 px-3">{l.exchange}</td>
                         <td className="py-2.5 px-3 font-mono-data">{l.pair}</td>

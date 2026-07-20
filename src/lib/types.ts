@@ -72,3 +72,34 @@ export interface ScenarioResult {
   oiChange: number;
   stopTriggered: boolean;
 }
+
+export interface PortfolioPosition {
+  id: string;
+  pair: string;
+  side: "LONG" | "SHORT";
+  size: number;
+  sizeUnit: "base" | "usd";
+  entry: number;
+  stopLoss: number;
+  markPrice: number;
+  verdictId?: string;
+}
+
+export interface PositionStressResult {
+  position: PortfolioPosition;
+  beta: number;
+  movePct: number;
+  shockedPrice: number;
+  pnl: number;
+  stopHit: boolean;
+  distToStopPct: number;
+  fundingShift: number;
+  oiChange: number;
+}
+
+export interface PortfolioStressResult {
+  positions: PositionStressResult[];
+  totalPnl: number;
+  stopsHit: number;
+  marketResults: ScenarioResult[];
+}

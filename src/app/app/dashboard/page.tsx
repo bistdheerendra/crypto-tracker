@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
-import { MOCK_NEWS } from "@/lib/mock-data";
-import type { Verdict } from "@/lib/types";
+import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import type { NewsItem, Verdict } from "@/lib/types";
 
 const DASHBOARD_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"] as const;
 
@@ -22,6 +22,11 @@ export default function DashboardPage() {
   const [prices, setPrices] = useState<Record<string, number | null>>({});
   const [timeframe, setTimeframe] = useState("1h");
   const [loadingVerdicts, setLoadingVerdicts] = useState(true);
+  const {
+    data: news,
+    loading: loadingNews,
+    error: newsError,
+  } = useRadarFeed<NewsItem>("news", 60_000);
 
   useEffect(() => {
     Promise.all(
@@ -141,9 +146,27 @@ export default function DashboardPage() {
         </div>
 
         <div>
-          <h2 className="text-lg font-semibold mb-4">Live News Feed</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Live News Feed</h2>
+            <span className="text-xs text-text-muted">Updates every 60s</span>
+          </div>
+          {newsError && (
+            <GlassCard className="mb-3 !p-3">
+              <p className="text-sm text-bear">{newsError}</p>
+            </GlassCard>
+          )}
           <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
-            {MOCK_NEWS.map((item) => (
+            {loadingNews && (
+              <GlassCard className="!p-3">
+                <p className="text-sm text-text-muted skeleton h-16" />
+              </GlassCard>
+            )}
+            {!loadingNews && news.length === 0 && !newsError && (
+              <GlassCard className="!p-3">
+                <p className="text-sm text-text-muted">No news available right now.</p>
+              </GlassCard>
+            )}
+            {news.map((item) => (
               <GlassCard key={item.id} className="!p-3 !rounded-none">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs text-text-muted font-mono-data">{item.location} · {item.timeAgo}</span>
