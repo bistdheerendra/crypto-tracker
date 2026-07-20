@@ -22,10 +22,3 @@ export function saveStoredPositions(positions: PortfolioPosition[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
 }
-
-export function seedPositionsIfEmpty(defaults: PortfolioPosition[]): PortfolioPosition[] {
-  const existing = loadStoredPositions();
-  if (existing !== null) return existing;
-  saveStoredPositions(defaults);
-  return defaults;
-}

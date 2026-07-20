@@ -20,7 +20,7 @@ async function fetchBtcWhales(minBtc: number, limit: number): Promise<WhaleTrans
     8000
   );
 
-  const btcPrice = await getPrice("BTC/USDT").catch(() => 95000);
+  const btcPrice = await getPrice("BTC/USDT");
 
   return (data.data ?? []).map((tx, i) => {
     const btc = (tx.output_total ?? 0) / 100_000_000;
@@ -47,7 +47,7 @@ async function fetchEthWhales(minEth: number, limit: number): Promise<WhaleTrans
     8000
   );
 
-  const ethPrice = await getPrice("ETH/USDT").catch(() => 3400);
+  const ethPrice = await getPrice("ETH/USDT");
 
   return (data.data ?? []).map((tx, i) => {
     const eth = (tx.output_total ?? tx.input_total ?? 0) / 1e18;

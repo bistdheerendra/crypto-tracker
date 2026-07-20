@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
-import { TRACKED_PAIRS } from "@/lib/mock-data";
+import { TRACKED_PAIRS } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
 const badgeColors: Record<string, string> = {

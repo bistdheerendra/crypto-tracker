@@ -12,15 +12,6 @@ const COINGECKO_IDS: Record<string, string> = {
   "PAXG/USDT": "pax-gold",
 };
 
-const FALLBACK_PRICES: Record<string, number> = {
-  "BTC/USDT": 94832.5,
-  "ETH/USDT": 3420.5,
-  "SOL/USDT": 178.25,
-  "BNB/USDT": 612.4,
-  "XRP/USDT": 0.62,
-  "PAXG/USDT": 2650,
-};
-
 async function fetchBinance(path: string) {
   let lastError: Error | null = null;
 
@@ -56,10 +47,6 @@ async function getPriceFromCoinGecko(symbol: string): Promise<number> {
   return price;
 }
 
-export function getFallbackPrice(symbol: string): number {
-  return FALLBACK_PRICES[symbol] ?? 100;
-}
-
 export async function getPrice(symbol: string): Promise<number> {
   const pair = symbol.replace("/", "");
 
@@ -67,11 +54,7 @@ export async function getPrice(symbol: string): Promise<number> {
     const data = await fetchBinance(`/ticker/price?symbol=${pair}`);
     return parseFloat(data.price);
   } catch {
-    try {
-      return await getPriceFromCoinGecko(symbol);
-    } catch {
-      return getFallbackPrice(symbol);
-    }
+    return getPriceFromCoinGecko(symbol);
   }
 }
 

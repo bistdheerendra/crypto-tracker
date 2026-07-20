@@ -3,18 +3,16 @@
 import { useState } from "react";
 import { Download, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { CORRELATION_MATRIX, TRACKED_PAIRS } from "@/lib/mock-data";
+import { TRACKED_PAIRS } from "@/lib/market/constants";
 import type { PortfolioPosition } from "@/lib/types";
 
-const PAIR_OPTIONS = [...TRACKED_PAIRS, ...Object.keys(CORRELATION_MATRIX)].filter(
-  (pair, i, arr) => arr.indexOf(pair) === i
-);
+const PAIR_OPTIONS = [...TRACKED_PAIRS];
 
 interface PositionControlsProps {
   onAdd: (position: Omit<PortfolioPosition, "id">) => void;
   onRemove: (id: string) => void;
   onImportVerdicts: (equity: number, riskPct: number) => Promise<{ imported: number; total: number }>;
-  onResetDemo: () => void;
+  onClearAll: () => void;
   positions: PortfolioPosition[];
   pricesLoading: boolean;
   onRefreshPrices: () => void;
@@ -40,7 +38,7 @@ export function PositionControls({
   onAdd,
   onRemove,
   onImportVerdicts,
-  onResetDemo,
+  onClearAll,
   positions,
   pricesLoading,
   onRefreshPrices,
@@ -151,10 +149,10 @@ export function PositionControls({
           </button>
           <button
             type="button"
-            onClick={onResetDemo}
+            onClick={onClearAll}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-sm text-text-muted hover:bg-white/10 transition-colors"
           >
-            Reset demo
+            Clear all
           </button>
         </div>
 

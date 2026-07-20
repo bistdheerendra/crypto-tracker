@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { PositionControls } from "@/components/scenarios/PositionControls";
-import { useLiveMarkPrices, useScenarioPortfolio } from "@/components/scenarios/useScenarioPortfolio";
-import { MOCK_PORTFOLIO_POSITIONS } from "@/lib/mock-data";
+import { useScenarioPortfolio } from "@/components/scenarios/useScenarioPortfolio";
+import { useCorrelationMatrix } from "@/hooks/useCorrelationMatrix";
 import { stressPortfolio } from "@/lib/scenarios/stress";
 import type { PortfolioPosition } from "@/lib/types";
 
@@ -35,6 +35,7 @@ interface StressTablesProps {
   isApp: boolean;
   pricesLoading: boolean;
   lastPriceUpdate: Date | null;
+  correlationMatrix: Record<string, number>;
   onRemove?: (id: string) => void;
 }
 
@@ -44,9 +45,13 @@ function StressTables({
   isApp,
   pricesLoading,
   lastPriceUpdate,
+  correlationMatrix,
   onRemove,
 }: StressTablesProps) {
-  const result = useMemo(() => stressPortfolio(positions, shock), [positions, shock]);
+  const result = useMemo(
+    () => stressPortfolio(positions, shock, correlationMatrix),
+    [positions, shock, correlationMatrix]
+  );
   const cellPad = isApp ? "py-3 px-4" : "py-2.5 px-4";
 
   return (
@@ -266,6 +271,7 @@ function StressTables({
 function AppScenarioStressPanel() {
   const [shock, setShock] = useState(-5);
   const portfolio = useScenarioPortfolio(true);
+  const { matrix, loading: matrixLoading, error: matrixError } = useCorrelationMatrix();
 
   if (!portfolio.hydrated) {
     return <p className="text-sm text-text-muted">Loading portfolio…</p>;
@@ -278,10 +284,16 @@ function AppScenarioStressPanel() {
         onAdd={portfolio.addPosition}
         onRemove={portfolio.removePosition}
         onImportVerdicts={portfolio.importOpenVerdicts}
-        onResetDemo={portfolio.resetToDemo}
+        onClearAll={portfolio.clearAll}
         pricesLoading={portfolio.pricesLoading}
         onRefreshPrices={portfolio.refreshPrices}
       />
+
+      {matrixError && (
+        <GlassCard className="mb-4 !p-3">
+          <p className="text-sm text-bear">{matrixError}</p>
+        </GlassCard>
+      )}
 
       <GlassCard className="mb-6 max-w-lg">
         <label className="text-sm text-text-muted mb-3 block">
@@ -312,8 +324,9 @@ function AppScenarioStressPanel() {
         positions={portfolio.positions}
         shock={shock}
         isApp
-        pricesLoading={portfolio.pricesLoading}
+        pricesLoading={portfolio.pricesLoading || matrixLoading}
         lastPriceUpdate={portfolio.lastPriceUpdate}
+        correlationMatrix={matrix}
         onRemove={portfolio.removePosition}
       />
     </>
@@ -322,7 +335,8 @@ function AppScenarioStressPanel() {
 
 function LandingScenarioStressPanel() {
   const [shock, setShock] = useState(-5);
-  const { livePositions, loading, lastPriceUpdate } = useLiveMarkPrices(MOCK_PORTFOLIO_POSITIONS, true);
+  const { matrix, loading: matrixLoading } = useCorrelationMatrix();
+  const emptyPositions: PortfolioPosition[] = [];
 
   return (
     <>
@@ -348,11 +362,12 @@ function LandingScenarioStressPanel() {
       </GlassCard>
 
       <StressTables
-        positions={livePositions}
+        positions={emptyPositions}
         shock={shock}
         isApp={false}
-        pricesLoading={loading}
-        lastPriceUpdate={lastPriceUpdate}
+        pricesLoading={matrixLoading}
+        lastPriceUpdate={null}
+        correlationMatrix={matrix}
       />
     </>
   );

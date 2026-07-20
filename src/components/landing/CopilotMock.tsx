@@ -1,20 +1,53 @@
 "use client";
 
+import { useState } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 
-const messages = [
-  {
-    role: "user" as const,
-    text: "Should I add to my BTC position here?",
-  },
-  {
-    role: "bot" as const,
-    text: "BTC/USDT is at $94,832 (+1.2% 24h). RSI(14) at 58 — not overbought. Price sits above the 50 EMA ($93,400) with positive MACD momentum. Funding is mild at 0.008%. Risk: adding here with a stop below $93,120 (1.8% risk) aligns with the current LONG verdict. Not financial advice.",
-  },
-];
+interface Message {
+  role: "user" | "bot";
+  text: string;
+}
 
 export function CopilotMock() {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "bot",
+      text: "Ask me about any Binance-listable pair — every answer uses live price data. Not financial advice.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
+
+    const userMsg = input.trim();
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", text: userMsg }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/copilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg }),
+      });
+      const data = await res.json();
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: data.reply ?? data.error ?? "Could not get a response." },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", text: "Sorry, I couldn't reach the copilot service." },
+      ]);
+    }
+    setLoading(false);
+  }
+
   return (
     <section id="copilot" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
@@ -58,17 +91,29 @@ export function CopilotMock() {
                 </div>
               </div>
             ))}
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-text-muted">
+                  Thinking…
+                </div>
+              </div>
+            )}
+            <form onSubmit={sendMessage} className="flex flex-col sm:flex-row gap-2 pt-2">
               <input
                 type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about any Binance pair..."
                 className="flex-1 bg-white/5 border border-white/8 rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 min-w-0"
-                readOnly
               />
-              <button className="w-full sm:w-auto px-4 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto px-4 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0 disabled:opacity-50"
+              >
                 Send
               </button>
-            </div>
+            </form>
           </GlassCard>
         </ScrollReveal>
       </div>

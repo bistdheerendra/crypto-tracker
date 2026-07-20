@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPrice, get24hTicker, getFallbackPrice } from "@/lib/binance";
+import { getPrice, get24hTicker } from "@/lib/binance";
 
 export async function POST(req: NextRequest) {
   const { message } = await req.json();
@@ -7,22 +7,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Message required" }, { status: 400 });
   }
 
-  const pairMatch = message.match(/\b(BTC|ETH|SOL|BNB|XRP)\b/i);
+  const pairMatch = message.match(/\b(BTC|ETH|SOL|BNB|XRP|PAXG)\b/i);
   const symbol = pairMatch ? `${pairMatch[1].toUpperCase()}/USDT` : "BTC/USDT";
 
-  let price = 0;
-  let change24h = 0;
   try {
-    const [p, ticker] = await Promise.all([getPrice(symbol), get24hTicker(symbol)]);
-    price = p;
-    change24h = parseFloat(ticker.priceChangePercent);
+    const [price, ticker] = await Promise.all([getPrice(symbol), get24hTicker(symbol)]);
+    const change24h = parseFloat(String(ticker.priceChangePercent ?? 0));
+    const reply = generateReply(message, symbol, price, change24h);
+    return NextResponse.json({ reply, symbol, price });
   } catch {
-    price = getFallbackPrice(symbol);
-    change24h = 1.2;
+    return NextResponse.json(
+      { error: "Live market data unavailable. Try again shortly." },
+      { status: 503 }
+    );
   }
-
-  const reply = generateReply(message, symbol, price, change24h);
-  return NextResponse.json({ reply, symbol, price });
 }
 
 function generateReply(

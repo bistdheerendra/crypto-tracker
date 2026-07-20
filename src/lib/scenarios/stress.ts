@@ -1,4 +1,3 @@
-import { CORRELATION_MATRIX } from "@/lib/mock-data";
 import type {
   PortfolioPosition,
   PortfolioStressResult,
@@ -8,10 +7,11 @@ import type {
 
 const DEFAULT_BETA = 0.7;
 const STOP_MOVE_THRESHOLD = 3;
+const EMPTY_MATRIX: Record<string, number> = {};
 
 export function getBeta(
   pair: string,
-  matrix: Record<string, number> = CORRELATION_MATRIX
+  matrix: Record<string, number> = EMPTY_MATRIX
 ): number {
   if (pair === "BTC/USDT") return 1;
   return matrix[pair] ?? DEFAULT_BETA;
@@ -20,7 +20,7 @@ export function getBeta(
 export function getMovePct(
   shock: number,
   pair: string,
-  matrix: Record<string, number> = CORRELATION_MATRIX
+  matrix: Record<string, number> = EMPTY_MATRIX
 ): number {
   return shock * getBeta(pair, matrix);
 }
@@ -36,7 +36,7 @@ export function getPositionQuantity(pos: PortfolioPosition): number {
 export function stressPosition(
   pos: PortfolioPosition,
   shock: number,
-  matrix: Record<string, number> = CORRELATION_MATRIX
+  matrix: Record<string, number> = EMPTY_MATRIX
 ): PositionStressResult {
   const beta = getBeta(pos.pair, matrix);
   const movePct = shock * beta;
@@ -78,7 +78,7 @@ export function stressPosition(
 
 export function computeMarketCascade(
   shock: number,
-  matrix: Record<string, number> = CORRELATION_MATRIX
+  matrix: Record<string, number> = EMPTY_MATRIX
 ): ScenarioResult[] {
   return Object.entries(matrix).map(([asset, beta]) => ({
     asset,
@@ -92,7 +92,7 @@ export function computeMarketCascade(
 export function stressPortfolio(
   positions: PortfolioPosition[],
   shock: number,
-  matrix: Record<string, number> = CORRELATION_MATRIX
+  matrix: Record<string, number> = EMPTY_MATRIX
 ): PortfolioStressResult {
   const positionResults = positions.map((p) => stressPosition(p, shock, matrix));
   const totalPnl = positionResults.reduce((sum, r) => sum + r.pnl, 0);

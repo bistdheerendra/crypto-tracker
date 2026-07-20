@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MOCK_PORTFOLIO_POSITIONS } from "@/lib/mock-data";
 import { applyMarkPrices, fetchMarkPrices } from "@/lib/scenarios/mark-prices";
 import {
   createPositionId,
+  loadStoredPositions,
   saveStoredPositions,
-  seedPositionsIfEmpty,
 } from "@/lib/scenarios/positions-store";
 import { importVerdictsAsPositions } from "@/lib/scenarios/verdict-import";
 import type { StoredVerdict } from "@/lib/verdicts/types";
@@ -20,8 +19,7 @@ export function useScenarioPortfolio(enabled: boolean) {
 
   useEffect(() => {
     if (!enabled) return;
-    const initial = seedPositionsIfEmpty(MOCK_PORTFOLIO_POSITIONS);
-    setPositions(initial);
+    setPositions(loadStoredPositions() ?? []);
     setHydrated(true);
   }, [enabled]);
 
@@ -52,7 +50,6 @@ export function useScenarioPortfolio(enabled: boolean) {
   useEffect(() => {
     if (!enabled || !hydrated) return;
     refreshPrices(positions);
-    // Initial live price fetch after hydration only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, hydrated]);
 
@@ -73,10 +70,9 @@ export function useScenarioPortfolio(enabled: boolean) {
     [positions, persist]
   );
 
-  const resetToDemo = useCallback(() => {
-    persist([...MOCK_PORTFOLIO_POSITIONS]);
-    void refreshPrices(MOCK_PORTFOLIO_POSITIONS);
-  }, [persist, refreshPrices]);
+  const clearAll = useCallback(() => {
+    persist([]);
+  }, [persist]);
 
   const importOpenVerdicts = useCallback(
     async (equity: number, riskPct: number) => {
@@ -106,7 +102,7 @@ export function useScenarioPortfolio(enabled: boolean) {
     lastPriceUpdate,
     addPosition,
     removePosition,
-    resetToDemo,
+    clearAll,
     importOpenVerdicts,
     refreshPrices: () => refreshPrices(positions),
   };

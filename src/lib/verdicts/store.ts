@@ -1,13 +1,9 @@
 import type { LaneOutput, Verdict } from "../types";
-import { generateSeedVerdicts } from "./seed";
 import { laneBiasesFromLanes, TIER_ORDER, type StoredVerdict, type VerdictOutcome } from "./types";
 
-let verdicts: StoredVerdict[] | null = null;
+let verdicts: StoredVerdict[] = [];
 
 function ensureLoaded(): StoredVerdict[] {
-  if (!verdicts) {
-    verdicts = generateSeedVerdicts();
-  }
   return verdicts;
 }
 

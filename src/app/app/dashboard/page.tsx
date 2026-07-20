@@ -8,7 +8,7 @@ import { TierPill } from "@/components/ui/TierPill";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
 import type { NewsItem, Verdict } from "@/lib/types";
 
-const DASHBOARD_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "PAXG/USDT"] as const;
+import { DASHBOARD_PAIRS, TRACKED_PAIRS } from "@/lib/market/constants";
 
 const TIMEFRAMES = [
   { label: "15m", value: "15m" },
@@ -89,7 +89,7 @@ export default function DashboardPage() {
         </GlassCard>
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Watchlist</p>
-          <p className="font-mono-data text-2xl sm:text-3xl font-bold">6 pairs</p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold">{TRACKED_PAIRS.length} pairs</p>
         </GlassCard>
       </div>
 

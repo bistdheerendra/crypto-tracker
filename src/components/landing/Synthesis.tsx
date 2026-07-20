@@ -3,22 +3,11 @@
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TierPill } from "@/components/ui/TierPill";
-
-const verdict = {
-  pair: "BTC/USDT",
-  timeframe: "1h",
-  tier: "HIGH" as const,
-  direction: "LONG",
-  alignment: "3/4 lanes aligned",
-  entry: 94832.5,
-  stopLoss: 93120.0,
-  takeProfit1: 97200.0,
-  takeProfit2: 99850.0,
-  rationale: "Technical + Flow lanes support upside; macro headwinds noted but outweighed.",
-  riskReward: "1:2.4",
-};
+import { useLiveAnalysis } from "@/hooks/useLiveAnalysis";
 
 export function Synthesis() {
+  const { verdict, loading, error } = useLiveAnalysis("BTC/USDT", "1h");
+
   return (
     <section id="synthesis" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
@@ -31,40 +20,70 @@ export function Synthesis() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.15}>
-          <GlassCard glow="accent" className="!p-4 sm:!p-6 lg:!p-8">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
-              <span className="font-mono-data text-base sm:text-lg font-semibold">
-                {verdict.pair} · {verdict.timeframe}
-              </span>
-              <TierPill tier={verdict.tier} />
-              <span className="px-3 py-1 rounded bg-bull/15 text-bull border border-bull/30 text-sm font-bold font-mono-data">
-                {verdict.direction}
-              </span>
-              <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
-            </div>
+          {error && (
+            <GlassCard className="mb-4 !p-4">
+              <p className="text-sm text-bear">{error}</p>
+            </GlassCard>
+          )}
+          {loading && (
+            <GlassCard glow="accent" className="!p-8">
+              <div className="skeleton h-48" />
+            </GlassCard>
+          )}
+          {!loading && verdict && (
+            <GlassCard glow="accent" className="!p-4 sm:!p-6 lg:!p-8">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
+                <span className="font-mono-data text-base sm:text-lg font-semibold">
+                  {verdict.pair} · {verdict.timeframe}
+                </span>
+                <TierPill tier={verdict.tier} />
+                <span
+                  className={`px-3 py-1 rounded border text-sm font-bold font-mono-data ${
+                    verdict.direction === "LONG"
+                      ? "bg-bull/15 text-bull border-bull/30"
+                      : verdict.direction === "SHORT"
+                        ? "bg-bear/15 text-bear border-bear/30"
+                        : "bg-mixed/15 text-mixed border-mixed/30"
+                  }`}
+                >
+                  {verdict.direction}
+                </span>
+                <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">
+                  {verdict.alignment}
+                </span>
+              </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">Entry</p>
-                <p className="font-mono-data text-xl text-bull">${verdict.entry.toLocaleString()}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">Entry</p>
+                  <p className="font-mono-data text-xl text-bull">
+                    ${verdict.entry.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">Stop Loss</p>
+                  <p className="font-mono-data text-xl text-bear">
+                    ${verdict.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">TP 1</p>
+                  <p className="font-mono-data text-xl text-bull">
+                    ${verdict.takeProfit1.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">TP 2</p>
+                  <p className="font-mono-data text-xl text-bull">
+                    ${verdict.takeProfit2.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">Stop Loss</p>
-                <p className="font-mono-data text-xl text-bear">${verdict.stopLoss.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">TP 1</p>
-                <p className="font-mono-data text-xl text-bull">${verdict.takeProfit1.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-text-muted mb-1">TP 2</p>
-                <p className="font-mono-data text-xl text-bull">${verdict.takeProfit2.toLocaleString()}</p>
-              </div>
-            </div>
 
-            <p className="text-sm text-text-muted mb-2">{verdict.rationale}</p>
-            <p className="text-xs text-accent font-mono-data">Risk:Reward {verdict.riskReward}</p>
-          </GlassCard>
+              <p className="text-sm text-text-muted mb-2">{verdict.rationale}</p>
+              <p className="text-xs text-accent font-mono-data">Risk:Reward {verdict.riskReward}</p>
+            </GlassCard>
+          )}
         </ScrollReveal>
       </div>
     </section>

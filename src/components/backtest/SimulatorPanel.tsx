@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { EquityCurveChart } from "@/components/backtest/EquityCurveChart";
-import { TRACKED_PAIRS } from "@/lib/mock-data";
+import { TRACKED_PAIRS } from "@/lib/market/constants";
 import type { SimulatorResult } from "@/lib/backtest/simulator";
 import { Play, AlertCircle } from "lucide-react";
 

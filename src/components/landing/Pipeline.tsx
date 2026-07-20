@@ -4,7 +4,7 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
-import { MOCK_LANES } from "@/lib/mock-data";
+import { useLiveAnalysis } from "@/hooks/useLiveAnalysis";
 
 const badgeColors: Record<string, string> = {
   T: "bg-accent/20 text-accent border-accent/30",
@@ -14,6 +14,8 @@ const badgeColors: Record<string, string> = {
 };
 
 export function Pipeline() {
+  const { lanes, loading, error } = useLiveAnalysis("BTC/USDT", "1h");
+
   return (
     <section id="pipeline" className="py-16 sm:py-24 px-4 sm:px-6 bg-bg-secondary/50">
       <div className="max-w-7xl mx-auto">
@@ -25,32 +27,45 @@ export function Pipeline() {
           </p>
         </ScrollReveal>
 
+        {error && (
+          <GlassCard className="mb-6 !p-4">
+            <p className="text-sm text-bear">{error}</p>
+          </GlassCard>
+        )}
+
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {MOCK_LANES.map((lane, i) => (
-            <ScrollReveal key={lane.lane} delay={i * 0.1}>
-              <GlassCard className="h-full">
-                <div className="flex items-center gap-3 mb-4">
-                  <div
-                    className={`w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold ${badgeColors[lane.badge]}`}
-                  >
-                    {lane.badge}
-                  </div>
-                  <h3 className="font-semibold">{lane.lane}</h3>
-                </div>
-                <div className="flex gap-2 mb-4">
-                  <BiasPill bias={lane.bias} />
-                  <TierPill tier={lane.tier} />
-                </div>
-                <ul className="space-y-2">
-                  {lane.reasoning.map((r, j) => (
-                    <li key={j} className="text-xs text-text-muted font-mono-data leading-relaxed">
-                      › {r}
-                    </li>
-                  ))}
-                </ul>
+          {loading &&
+            Array.from({ length: 4 }).map((_, i) => (
+              <GlassCard key={i} className="h-full">
+                <div className="skeleton h-40" />
               </GlassCard>
-            </ScrollReveal>
-          ))}
+            ))}
+          {!loading &&
+            lanes.map((lane, i) => (
+              <ScrollReveal key={lane.lane} delay={i * 0.1}>
+                <GlassCard className="h-full">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className={`w-8 h-8 rounded-full border flex items-center justify-center text-sm font-bold ${badgeColors[lane.badge]}`}
+                    >
+                      {lane.badge}
+                    </div>
+                    <h3 className="font-semibold">{lane.lane}</h3>
+                  </div>
+                  <div className="flex gap-2 mb-4">
+                    <BiasPill bias={lane.bias} />
+                    <TierPill tier={lane.tier} />
+                  </div>
+                  <ul className="space-y-2">
+                    {lane.reasoning.map((r, j) => (
+                      <li key={j} className="text-xs text-text-muted font-mono-data leading-relaxed">
+                        › {r}
+                      </li>
+                    ))}
+                  </ul>
+                </GlassCard>
+              </ScrollReveal>
+            ))}
         </div>
       </div>
     </section>

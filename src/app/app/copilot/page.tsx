@@ -34,6 +34,13 @@ export default function CopilotPage() {
         body: JSON.stringify({ message: userMsg }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "bot", text: data.error ?? "Could not get a response." },
+        ]);
+        return;
+      }
       setMessages((prev) => [...prev, { role: "bot", text: data.reply }]);
     } catch {
       setMessages((prev) => [

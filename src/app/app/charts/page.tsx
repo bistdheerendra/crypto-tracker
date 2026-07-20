@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { LiveCandleChart } from "@/components/charts/LiveCandleChart";
 import { VerdictCard } from "@/components/charts/VerdictCard";
-import { TRACKED_PAIRS } from "@/lib/mock-data";
+import { TRACKED_PAIRS } from "@/lib/market/constants";
 import {
   TIMEFRAME_OPTIONS,
   getStoredPair,

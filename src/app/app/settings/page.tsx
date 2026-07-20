@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
-import { TRACKED_PAIRS } from "@/lib/mock-data";
+import { TRACKED_PAIRS } from "@/lib/market/constants";
 import { Send, Bell, User } from "lucide-react";
 
 export default function SettingsPage() {
   const [telegramLinked, setTelegramLinked] = useState(false);
-  const [watchlist, setWatchlist] = useState(["BTC/USDT", "ETH/USDT", "SOL/USDT"]);
+  const [watchlist, setWatchlist] = useState<string[]>([...TRACKED_PAIRS]);
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [minTier, setMinTier] = useState("HIGH");
 
