@@ -292,6 +292,7 @@ export const TRACKED_PAIRS = [
   "SOL/USDT",
   "BNB/USDT",
   "XRP/USDT",
+  "PAXG/USDT",
 ];
 
 export const CORRELATION_MATRIX: Record<string, number> = {

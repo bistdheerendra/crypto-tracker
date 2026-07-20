@@ -9,6 +9,7 @@ const COINGECKO_IDS: Record<string, string> = {
   "SOL/USDT": "solana",
   "BNB/USDT": "binancecoin",
   "XRP/USDT": "ripple",
+  "PAXG/USDT": "pax-gold",
 };
 
 const FALLBACK_PRICES: Record<string, number> = {
@@ -17,6 +18,7 @@ const FALLBACK_PRICES: Record<string, number> = {
   "SOL/USDT": 178.25,
   "BNB/USDT": 612.4,
   "XRP/USDT": 0.62,
+  "PAXG/USDT": 2650,
 };
 
 async function fetchBinance(path: string) {

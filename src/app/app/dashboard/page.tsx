@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
 import type { NewsItem, Verdict } from "@/lib/types";
 
-const DASHBOARD_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"] as const;
+const DASHBOARD_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "PAXG/USDT"] as const;
 
 const TIMEFRAMES = [
   { label: "15m", value: "15m" },
@@ -63,15 +64,20 @@ export default function DashboardPage() {
         <p className="text-text-muted text-sm">Live market intelligence at a glance.</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {DASHBOARD_PAIRS.map((pair) => (
           <GlassCard key={pair}>
-            <p className="text-xs text-text-muted uppercase tracking-wider mb-2">{pair}</p>
-            <p className="font-mono-data text-2xl sm:text-3xl font-bold">
-              {prices[pair] != null
-                ? `$${prices[pair]!.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                : "—"}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs text-text-muted uppercase tracking-wider mb-2">{pair}</p>
+                <p className="font-mono-data text-2xl sm:text-3xl font-bold">
+                  {prices[pair] != null
+                    ? `$${prices[pair]!.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                    : "—"}
+                </p>
+              </div>
+              <CoinIcon symbol={pairBaseSymbol(pair)} size={40} className="ring-1 ring-white/10" />
+            </div>
           </GlassCard>
         ))}
       </div>
@@ -83,7 +89,7 @@ export default function DashboardPage() {
         </GlassCard>
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Watchlist</p>
-          <p className="font-mono-data text-2xl sm:text-3xl font-bold">5 pairs</p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold">6 pairs</p>
         </GlassCard>
       </div>
 
