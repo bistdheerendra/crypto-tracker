@@ -31,6 +31,7 @@ export interface NewsItem {
   country: string;
   timeAgo: string;
   headline: string;
+  source: string;
   sentiment: Sentiment;
   marketTag: string;
   connected: number;

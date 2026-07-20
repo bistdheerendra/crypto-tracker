@@ -99,7 +99,8 @@ export function EarthRadar() {
                   </div>
                   <p className="text-sm leading-relaxed mb-2">{item.headline}</p>
                   <div className="flex items-center gap-3 text-xs text-text-muted">
-                    <span className="px-2 py-0.5 bg-white/5 rounded">{item.marketTag}</span>
+                    <span className="px-2 py-0.5 bg-white/5">{item.source}</span>
+                    <span className="px-2 py-0.5 bg-white/5">{item.marketTag}</span>
                     <span className="text-accent font-mono-data">{item.connected} connected</span>
                   </div>
                 </GlassCard>

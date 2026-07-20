@@ -9,9 +9,19 @@ import type { Verdict } from "@/lib/types";
 
 const DASHBOARD_PAIRS = ["BTC/USDT", "ETH/USDT", "SOL/USDT"] as const;
 
+const TIMEFRAMES = [
+  { label: "15m", value: "15m" },
+  { label: "30m", value: "30m" },
+  { label: "1h", value: "1h" },
+  { label: "4h", value: "4h" },
+  { label: "1D", value: "1d" },
+] as const;
+
 export default function DashboardPage() {
   const [verdicts, setVerdicts] = useState<Verdict[]>([]);
   const [prices, setPrices] = useState<Record<string, number | null>>({});
+  const [timeframe, setTimeframe] = useState("1h");
+  const [loadingVerdicts, setLoadingVerdicts] = useState(true);
 
   useEffect(() => {
     Promise.all(
@@ -24,18 +34,22 @@ export default function DashboardPage() {
     ).then((results) => {
       setPrices(Object.fromEntries(results));
     });
+  }, []);
 
+  useEffect(() => {
+    setLoadingVerdicts(true);
     Promise.all(
       DASHBOARD_PAIRS.map((pair) =>
-        fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=1h`)
+        fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
           .then((r) => r.json())
           .then((d) => d.verdict as Verdict)
           .catch(() => null)
       )
     ).then((results) => {
       setVerdicts(results.filter((v): v is Verdict => v !== null));
+      setLoadingVerdicts(false);
     });
-  }, []);
+  }, [timeframe]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -70,8 +84,35 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div>
-          <h2 className="text-lg font-semibold mb-4">Latest Verdicts</h2>
-          {verdicts.map((v) => (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold">Latest Verdicts</h2>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              {TIMEFRAMES.map((tf) => (
+                <button
+                  key={tf.value}
+                  type="button"
+                  onClick={() => setTimeframe(tf.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono-data whitespace-nowrap transition-colors ${
+                    timeframe === tf.value
+                      ? "bg-accent/15 text-accent border border-accent/30"
+                      : "text-text-muted hover:text-text-primary bg-white/5 border border-transparent"
+                  }`}
+                >
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {loadingVerdicts && (
+            <>
+              {DASHBOARD_PAIRS.map((pair) => (
+                <GlassCard key={pair} className="mb-3">
+                  <p className="text-text-muted text-sm skeleton h-20" />
+                </GlassCard>
+              ))}
+            </>
+          )}
+          {!loadingVerdicts && verdicts.map((v) => (
             <GlassCard key={v.pair} className="mb-3" glow="accent">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                 <span className="font-mono-data font-semibold text-sm sm:text-base">{v.pair} · {v.timeframe}</span>
@@ -88,7 +129,7 @@ export default function DashboardPage() {
               </div>
             </GlassCard>
           ))}
-          {verdicts.length === 0 && (
+          {!loadingVerdicts && verdicts.length === 0 && (
             <>
               {DASHBOARD_PAIRS.map((pair) => (
                 <GlassCard key={pair} className="mb-3">
@@ -101,12 +142,13 @@ export default function DashboardPage() {
 
         <div>
           <h2 className="text-lg font-semibold mb-4">Live News Feed</h2>
-          <div className="space-y-2">
-            {MOCK_NEWS.slice(0, 4).map((item) => (
-              <GlassCard key={item.id} className="!p-3">
-                <div className="flex items-center gap-2 mb-1">
+          <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+            {MOCK_NEWS.map((item) => (
+              <GlassCard key={item.id} className="!p-3 !rounded-none">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs text-text-muted font-mono-data">{item.location} · {item.timeAgo}</span>
                   <BiasPill bias={item.sentiment === "bullish" ? "BULL" : item.sentiment === "bearish" ? "BEAR" : "MIXED"} />
+                  <span className="text-[10px] uppercase tracking-wider text-accent ml-auto">{item.source}</span>
                 </div>
                 <p className="text-sm">{item.headline}</p>
               </GlassCard>

@@ -1,0 +1,152 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { TierPill } from "@/components/ui/TierPill";
+import { intervalToApiTimeframe } from "@/lib/tradingview";
+import type { Verdict } from "@/lib/types";
+
+interface VerdictCardProps {
+  pair: string;
+  interval: string;
+}
+
+const PRICE_POLL_MS = 10_000;
+
+export function VerdictCard({ pair, interval }: VerdictCardProps) {
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [price, setPrice] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [priceFlash, setPriceFlash] = useState<"up" | "down" | null>(null);
+  const prevPriceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const timeframe = intervalToApiTimeframe(interval);
+    fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
+      .then((r) => r.json())
+      .then((d) => setVerdict(d.verdict))
+      .catch(() => setVerdict(null))
+      .finally(() => setLoading(false));
+  }, [pair, interval]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchPrice() {
+      try {
+        const res = await fetch(`/api/market?symbol=${encodeURIComponent(pair)}`);
+        const data = await res.json();
+        if (!active || typeof data.price !== "number") return;
+
+        const prev = prevPriceRef.current;
+        if (prev !== null && data.price !== prev) {
+          setPriceFlash(data.price > prev ? "up" : "down");
+          setTimeout(() => setPriceFlash(null), 600);
+        }
+
+        prevPriceRef.current = data.price;
+        setPrice(data.price);
+      } catch {
+        if (active) setPrice(null);
+      }
+    }
+
+    fetchPrice();
+    const timer = setInterval(fetchPrice, PRICE_POLL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [pair]);
+
+  if (loading) {
+    return (
+      <GlassCard className="h-full">
+        <div className="skeleton h-48" />
+      </GlassCard>
+    );
+  }
+
+  if (!verdict) {
+    return (
+      <GlassCard>
+        <p className="text-sm text-text-muted">Unable to load verdict for {pair}.</p>
+      </GlassCard>
+    );
+  }
+
+  return (
+    <GlassCard glow="accent" className="h-full">
+      <div className="mb-4 pb-4 border-b border-white/8">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs text-text-muted uppercase tracking-wider">Current Price</p>
+          <span className="flex items-center gap-1.5 text-[10px] text-bull uppercase tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-bull pulse-dot" />
+            Live
+          </span>
+        </div>
+        <p
+          className={`font-mono-data text-2xl sm:text-3xl font-bold transition-colors duration-300 ${
+            priceFlash === "up" ? "text-bull" : priceFlash === "down" ? "text-bear" : "text-text-primary"
+          }`}
+        >
+          {price != null
+            ? `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+            : "—"}
+        </p>
+        <p className="text-xs text-text-muted font-mono-data mt-1">{pair}</p>
+      </div>
+
+      <p className="text-xs tracking-[0.3em] text-accent uppercase mb-4">Synthesized Verdict</p>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="font-mono-data text-base font-semibold">
+          {verdict.pair} · {verdict.timeframe}
+        </span>
+        <TierPill tier={verdict.tier} />
+        <span
+          className={`px-2.5 py-0.5 rounded border text-xs font-bold font-mono-data ${
+            verdict.direction === "LONG"
+              ? "bg-bull/15 text-bull border-bull/30"
+              : verdict.direction === "SHORT"
+                ? "bg-bear/15 text-bear border-bear/30"
+                : "bg-mixed/15 text-mixed border-mixed/30"
+          }`}
+        >
+          {verdict.direction}
+        </span>
+      </div>
+      <p className="text-xs text-text-muted mb-4">{verdict.alignment}</p>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <p className="text-[10px] uppercase text-text-muted mb-1">Entry</p>
+          <p className="font-mono-data text-lg text-bull">
+            ${verdict.entry.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-text-muted mb-1">Stop Loss</p>
+          <p className="font-mono-data text-lg text-bear">
+            ${verdict.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-text-muted mb-1">TP 1</p>
+          <p className="font-mono-data text-lg text-bull">
+            ${verdict.takeProfit1.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase text-text-muted mb-1">TP 2</p>
+          <p className="font-mono-data text-lg text-bull">
+            ${verdict.takeProfit2.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-sm text-text-muted mb-2">{verdict.rationale}</p>
+      <p className="text-xs text-accent font-mono-data">Risk:Reward {verdict.riskReward}</p>
+    </GlassCard>
+  );
+}
