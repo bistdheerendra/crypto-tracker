@@ -5,7 +5,7 @@ export default function PrivacyPage() {
       <div className="prose prose-invert text-text-muted space-y-4 text-sm leading-relaxed">
         <p>Last updated: July 2026</p>
         <p>
-          DeepCurrent collects account information (email) and optional Telegram chat IDs for alert
+          Dheerendra Intelligence collects account information (email) and optional Telegram chat IDs for alert
           delivery. We do not sell your personal data to third parties.
         </p>
         <p>

@@ -16,7 +16,7 @@ export default function Home() {
     <main>
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-bg-primary/80 backdrop-blur-sm border-b border-white/8 lg:top-auto lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
         <Link href="/" className="font-bold text-lg tracking-tight">
-          Deep<span className="text-accent">Current</span>
+          Dheerendra <span className="text-accent">Intelligence</span>
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <Link href="/auth/login" className="text-text-muted hover:text-text-primary transition-colors">

@@ -12,7 +12,7 @@ export default function CopilotPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "bot",
-      text: "I'm your DeepCurrent copilot. Ask me about any Binance-listable crypto pair — I'll anchor every answer to live price data. Not financial advice.",
+      text: "I'm your Dheerendra Intelligence copilot. Ask me about any Binance-listable crypto pair — I'll anchor every answer to live price data. Not financial advice.",
     },
   ]);
   const [input, setInput] = useState("");

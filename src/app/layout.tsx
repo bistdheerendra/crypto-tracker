@@ -13,7 +13,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DeepCurrent — Crypto Trading Intelligence",
+  title: "Dheerendra Intelligence",
   description: "See the cause behind every market move. Four independent analysis lanes. One synthesized verdict.",
 };
 

@@ -28,7 +28,7 @@ export function Hero() {
       </div>
 
       <ScrollReveal className="relative z-10 text-center max-w-4xl">
-        <p className="text-xs tracking-[0.3em] text-accent uppercase mb-6">DeepCurrent Intelligence</p>
+        <p className="text-xs tracking-[0.3em] text-accent uppercase mb-6">Dheerendra Intelligence</p>
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6">
           The market
           <br />

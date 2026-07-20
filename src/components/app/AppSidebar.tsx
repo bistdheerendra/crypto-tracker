@@ -27,8 +27,8 @@ export function AppSidebar() {
   return (
     <aside className="w-56 shrink-0 border-r border-white/8 bg-bg-secondary/50 flex flex-col h-screen sticky top-0">
       <div className="p-5 border-b border-white/8">
-        <Link href="/" className="font-bold text-lg">
-          Deep<span className="text-accent">Current</span>
+        <Link href="/" className="font-bold text-sm leading-tight">
+          Dheerendra <span className="text-accent">Intelligence</span>
         </Link>
       </div>
       <nav className="flex-1 p-3 space-y-1">

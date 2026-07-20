@@ -5,7 +5,7 @@ export default function TermsPage() {
       <div className="prose prose-invert text-text-muted space-y-4 text-sm leading-relaxed">
         <p>Last updated: July 2026</p>
         <p>
-          DeepCurrent provides crypto market analysis and trading intelligence tools for informational
+          Dheerendra Intelligence provides crypto market analysis and trading intelligence tools for informational
           purposes only. Nothing on this platform constitutes financial advice, investment advice,
           or a recommendation to buy or sell any asset.
         </p>
@@ -14,7 +14,7 @@ export default function TermsPage() {
           lane or synthesized signal does not guarantee future results.
         </p>
         <p>
-          By using DeepCurrent, you agree to use the platform at your own risk and to comply with
+          By using Dheerendra Intelligence, you agree to use the platform at your own risk and to comply with
           applicable laws in your jurisdiction regarding cryptocurrency trading.
         </p>
       </div>
