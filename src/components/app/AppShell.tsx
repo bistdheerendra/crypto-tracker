@@ -13,11 +13,13 @@ import {
   LogOut,
   Menu,
   X,
+  History,
 } from "lucide-react";
 
 const NAV = [
   { href: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/app/analyze", label: "Analyze", icon: BarChart3 },
+  { href: "/app/backtest", label: "Backtest", icon: History },
   { href: "/app/copilot", label: "Copilot", icon: MessageSquare },
   { href: "/app/radar", label: "Radar", icon: Radar },
   { href: "/app/scenarios", label: "Scenarios", icon: FlaskConical },

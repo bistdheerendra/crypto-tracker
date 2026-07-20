@@ -1,12 +1,6 @@
 import type { Bias, Direction, LaneOutput, Tier, Verdict } from "../types";
 import { computeATR } from "../binance";
-
-const LANE_WEIGHTS: Record<string, number> = {
-  Technical: 0.3,
-  Flow: 0.25,
-  Narrative: 0.25,
-  Macro: 0.2,
-};
+import { getDynamicLaneWeights } from "../backtest/lane-weights";
 
 const BIAS_SCORE: Record<Bias, number> = {
   BULL: 1,
@@ -31,9 +25,10 @@ export function synthesizeVerdict(
   let totalWeight = 0;
   let aligned = 0;
   const dominantBias = getDominantBias(lanes);
+  const { weights: laneWeights } = getDynamicLaneWeights();
 
   for (const lane of lanes) {
-    const w = LANE_WEIGHTS[lane.lane] ?? 0.25;
+    const w = laneWeights[lane.lane] ?? 0.25;
     const laneScore = BIAS_SCORE[lane.bias] * TIER_SCORE[lane.tier];
     score += laneScore * w;
     totalWeight += w;
