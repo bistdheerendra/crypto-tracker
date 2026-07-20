@@ -6,7 +6,7 @@ import { Send } from "lucide-react";
 
 export function Delivery() {
   return (
-    <section id="delivery" className="py-24 px-6 bg-bg-secondary/50">
+    <section id="delivery" className="py-16 sm:py-24 px-4 sm:px-6 bg-bg-secondary/50">
       <div className="max-w-2xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Delivery</p>

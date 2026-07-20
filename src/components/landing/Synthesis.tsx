@@ -20,7 +20,7 @@ const verdict = {
 
 export function Synthesis() {
   return (
-    <section id="synthesis" className="py-24 px-6">
+    <section id="synthesis" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Synthesis</p>
@@ -31,16 +31,16 @@ export function Synthesis() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.15}>
-          <GlassCard glow="accent" className="!p-8">
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              <span className="font-mono-data text-lg font-semibold">
+          <GlassCard glow="accent" className="!p-4 sm:!p-6 lg:!p-8">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
+              <span className="font-mono-data text-base sm:text-lg font-semibold">
                 {verdict.pair} · {verdict.timeframe}
               </span>
               <TierPill tier={verdict.tier} />
               <span className="px-3 py-1 rounded bg-bull/15 text-bull border border-bull/30 text-sm font-bold font-mono-data">
                 {verdict.direction}
               </span>
-              <span className="text-xs text-text-muted ml-auto">{verdict.alignment}</span>
+              <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,11 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Dheerendra Intelligence",
   description: "See the cause behind every market move. Four independent analysis lanes. One synthesized verdict.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

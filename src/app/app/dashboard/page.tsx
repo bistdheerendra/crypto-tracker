@@ -38,9 +38,9 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">Dashboard</h1>
         <p className="text-text-muted text-sm">Live market intelligence at a glance.</p>
       </div>
 
@@ -48,7 +48,7 @@ export default function DashboardPage() {
         {DASHBOARD_PAIRS.map((pair) => (
           <GlassCard key={pair}>
             <p className="text-xs text-text-muted uppercase tracking-wider mb-2">{pair}</p>
-            <p className="font-mono-data text-3xl font-bold">
+            <p className="font-mono-data text-2xl sm:text-3xl font-bold">
               {prices[pair] != null
                 ? `$${prices[pair]!.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                 : "—"}
@@ -60,11 +60,11 @@ export default function DashboardPage() {
       <div className="grid sm:grid-cols-2 gap-6 mb-8">
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Active Signals</p>
-          <p className="font-mono-data text-3xl font-bold text-accent">{verdicts.length}</p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold text-accent">{verdicts.length}</p>
         </GlassCard>
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Watchlist</p>
-          <p className="font-mono-data text-3xl font-bold">5 pairs</p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold">5 pairs</p>
         </GlassCard>
       </div>
 
@@ -73,14 +73,14 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold mb-4">Latest Verdicts</h2>
           {verdicts.map((v) => (
             <GlassCard key={v.pair} className="mb-3" glow="accent">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="font-mono-data font-semibold">{v.pair} · {v.timeframe}</span>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
+                <span className="font-mono-data font-semibold text-sm sm:text-base">{v.pair} · {v.timeframe}</span>
                 <TierPill tier={v.tier} />
                 <span className={`font-mono-data text-sm font-bold ${v.direction === "LONG" ? "text-bull" : v.direction === "SHORT" ? "text-bear" : "text-mixed"}`}>
                   {v.direction}
                 </span>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-xs font-mono-data">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono-data">
                 <div><span className="text-text-muted">Entry </span><span className="text-bull">${v.entry.toFixed(0)}</span></div>
                 <div><span className="text-text-muted">SL </span><span className="text-bear">${v.stopLoss.toFixed(0)}</span></div>
                 <div><span className="text-text-muted">TP1 </span><span className="text-bull">${v.takeProfit1.toFixed(0)}</span></div>

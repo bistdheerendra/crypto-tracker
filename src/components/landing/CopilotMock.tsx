@@ -16,7 +16,7 @@ const messages = [
 
 export function CopilotMock() {
   return (
-    <section id="copilot" className="py-24 px-6">
+    <section id="copilot" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-2xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Copilot</p>
@@ -58,14 +58,14 @@ export function CopilotMock() {
                 </div>
               </div>
             ))}
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <input
                 type="text"
                 placeholder="Ask about any Binance pair..."
-                className="flex-1 bg-white/5 border border-white/8 rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40"
+                className="flex-1 bg-white/5 border border-white/8 rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 min-w-0"
                 readOnly
               />
-              <button className="px-4 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors">
+              <button className="w-full sm:w-auto px-4 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors shrink-0">
                 Send
               </button>
             </div>

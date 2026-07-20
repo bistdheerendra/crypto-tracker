@@ -40,30 +40,30 @@ export default function AnalyzePage() {
   }, []);
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-1">Analyze</h1>
-      <p className="text-text-muted text-sm mb-8">Run the 4-lane pipeline for any tracked pair.</p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold mb-1">Analyze</h1>
+      <p className="text-text-muted text-sm mb-6 sm:mb-8">Run the 4-lane pipeline for any tracked pair.</p>
 
-      <GlassCard className="mb-8 !p-4">
-        <div className="flex flex-wrap gap-4 items-end">
-          <div>
+      <GlassCard className="mb-6 sm:mb-8 !p-4">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 sm:items-end">
+          <div className="w-full sm:w-auto sm:flex-1 sm:max-w-xs">
             <label className="text-xs text-text-muted uppercase tracking-wider mb-1.5 block">Pair</label>
             <select
               value={pair}
               onChange={(e) => setPair(e.target.value)}
-              className="bg-bg-card border border-white/8 rounded-lg px-4 py-2.5 text-sm font-mono-data text-text-primary focus:outline-none focus:border-accent/40"
+              className="w-full bg-bg-card border border-white/8 rounded-lg px-4 py-2.5 text-sm font-mono-data text-text-primary focus:outline-none focus:border-accent/40"
             >
               {TRACKED_PAIRS.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
           </div>
-          <div>
+          <div className="w-full sm:w-auto sm:flex-1 sm:max-w-xs">
             <label className="text-xs text-text-muted uppercase tracking-wider mb-1.5 block">Timeframe</label>
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
-              className="bg-bg-card border border-white/8 rounded-lg px-4 py-2.5 text-sm font-mono-data text-text-primary focus:outline-none focus:border-accent/40"
+              className="w-full bg-bg-card border border-white/8 rounded-lg px-4 py-2.5 text-sm font-mono-data text-text-primary focus:outline-none focus:border-accent/40"
             >
               {["15m", "1h", "4h", "1d"].map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -73,7 +73,7 @@ export default function AnalyzePage() {
           <button
             onClick={runAnalysis}
             disabled={loading}
-            className="px-6 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
           >
             {loading ? "Running..." : "Run Pipeline"}
           </button>
@@ -106,10 +106,10 @@ export default function AnalyzePage() {
       </div>
 
       {verdict && (
-        <GlassCard glow="accent" className="!p-8">
+        <GlassCard glow="accent" className="!p-4 sm:!p-6 lg:!p-8">
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-4">Synthesized Verdict</p>
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <span className="font-mono-data text-xl font-semibold">{verdict.pair} · {verdict.timeframe}</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
+            <span className="font-mono-data text-lg sm:text-xl font-semibold">{verdict.pair} · {verdict.timeframe}</span>
             <TierPill tier={verdict.tier} />
             <span className={`px-3 py-1 rounded border text-sm font-bold font-mono-data ${
               verdict.direction === "LONG" ? "bg-bull/15 text-bull border-bull/30" :
@@ -118,7 +118,7 @@ export default function AnalyzePage() {
             }`}>
               {verdict.direction}
             </span>
-            <span className="text-xs text-text-muted ml-auto">{verdict.alignment}</span>
+            <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div><p className="text-[10px] uppercase text-text-muted mb-1">Entry</p><p className="font-mono-data text-xl text-bull">${verdict.entry.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>

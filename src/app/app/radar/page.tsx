@@ -10,16 +10,16 @@ export default function RadarPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Whales");
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-1">Institutional Radar</h1>
-      <p className="text-text-muted text-sm mb-8">Whale movements, ETF flows, and liquidation events.</p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold mb-1">Institutional Radar</h1>
+      <p className="text-text-muted text-sm mb-6 sm:mb-8">Whale movements, ETF flows, and liquidation events.</p>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
               activeTab === tab
                 ? "bg-accent/15 text-accent border border-accent/30"
                 : "text-text-muted hover:text-text-primary bg-white/5"
@@ -33,7 +33,7 @@ export default function RadarPage() {
       <GlassCard className="!p-0 overflow-hidden">
         <div className="overflow-x-auto">
           {activeTab === "Whales" && (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Address</th>
@@ -62,7 +62,7 @@ export default function RadarPage() {
           )}
 
           {activeTab === "ETF Flows" && (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Ticker</th>
@@ -87,7 +87,7 @@ export default function RadarPage() {
           )}
 
           {activeTab === "Liquidations" && (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Exchange</th>

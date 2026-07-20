@@ -15,12 +15,12 @@ const badgeColors: Record<string, string> = {
 
 export function Pipeline() {
   return (
-    <section id="pipeline" className="py-24 px-6 bg-bg-secondary/50">
+    <section id="pipeline" className="py-16 sm:py-24 px-4 sm:px-6 bg-bg-secondary/50">
       <div className="max-w-7xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">The Pipeline</p>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Four independent lanes</h2>
-          <p className="text-text-muted max-w-xl mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Four independent lanes</h2>
+          <p className="text-text-muted max-w-xl mb-8 sm:mb-12">
             Each lane analyzes a different dimension of the market with zero shared bias.
           </p>
         </ScrollReveal>

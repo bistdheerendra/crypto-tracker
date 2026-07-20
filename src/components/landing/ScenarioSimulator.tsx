@@ -16,7 +16,7 @@ export function ScenarioSimulator() {
   }));
 
   return (
-    <section id="scenarios" className="py-24 px-6">
+    <section id="scenarios" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Stress Test</p>
@@ -48,7 +48,8 @@ export function ScenarioSimulator() {
           </GlassCard>
 
           <GlassCard className="!p-0 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Asset</th>
@@ -81,6 +82,7 @@ export function ScenarioSimulator() {
                 ))}
               </tbody>
             </table>
+            </div>
           </GlassCard>
         </ScrollReveal>
       </div>

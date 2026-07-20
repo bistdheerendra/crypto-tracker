@@ -16,9 +16,9 @@ export default function ScenariosPage() {
   }));
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-1">Scenario Simulator</h1>
-      <p className="text-text-muted text-sm mb-8">Stress-test portfolio impact from BTC shock scenarios.</p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <h1 className="text-xl sm:text-2xl font-bold mb-1">Scenario Simulator</h1>
+      <p className="text-text-muted text-sm mb-6 sm:mb-8">Stress-test portfolio impact from BTC shock scenarios.</p>
 
       <GlassCard className="mb-6 max-w-lg">
         <label className="text-sm text-text-muted mb-3 block">
@@ -39,7 +39,8 @@ export default function ScenariosPage() {
       </GlassCard>
 
       <GlassCard className="!p-0 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
               <th className="text-left py-3 px-4">Asset</th>
@@ -72,6 +73,7 @@ export default function ScenariosPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </GlassCard>
     </div>
   );

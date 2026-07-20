@@ -5,7 +5,7 @@ import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export function Hero() {
   return (
-    <section id="hero" className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
+    <section id="hero" className="relative min-h-screen min-h-dvh flex flex-col items-center justify-center px-4 sm:px-6 pt-28 pb-12 lg:pt-0 overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,166,255,0.08)_0%,transparent_70%)]" />
@@ -29,14 +29,14 @@ export function Hero() {
 
       <ScrollReveal className="relative z-10 text-center max-w-4xl">
         <p className="text-xs tracking-[0.3em] text-accent uppercase mb-6">Dheerendra Intelligence</p>
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6">
           The market
           <br />
           <span className="bg-gradient-to-r from-accent to-bull bg-clip-text text-transparent">
             runs deep.
           </span>
         </h1>
-        <p className="text-lg md:text-xl text-text-muted max-w-2xl mx-auto mb-12 leading-relaxed">
+        <p className="text-base sm:text-lg md:text-xl text-text-muted max-w-2xl mx-auto mb-10 sm:mb-12 leading-relaxed">
           See the cause behind every market move, not just the effect. Four independent
           analysis lanes. One synthesized verdict. Delivered where you trade.
         </p>

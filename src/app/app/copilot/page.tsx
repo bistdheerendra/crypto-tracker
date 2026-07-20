@@ -45,18 +45,18 @@ export default function CopilotPage() {
   }
 
   return (
-    <div className="p-8 flex flex-col h-screen">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Copilot</h1>
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col min-h-[calc(100dvh-3.5rem)] lg:min-h-screen">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">Copilot</h1>
         <p className="text-text-muted text-sm">Crypto-trading Q&A with live price context.</p>
       </div>
 
-      <GlassCard className="flex-1 flex flex-col !p-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <GlassCard className="flex-1 flex flex-col !p-0 overflow-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                className={`max-w-[92%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-accent/15 text-text-primary rounded-tr-sm"
                     : "bg-white/5 text-text-muted rounded-tl-sm"
@@ -85,18 +85,18 @@ export default function CopilotPage() {
           )}
         </div>
 
-        <form onSubmit={sendMessage} className="p-4 border-t border-white/8 flex gap-2">
+        <form onSubmit={sendMessage} className="p-3 sm:p-4 border-t border-white/8 flex flex-col sm:flex-row gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about BTC, ETH, SOL..."
-            className="flex-1 bg-white/5 border border-white/8 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent/40"
+            className="flex-1 bg-white/5 border border-white/8 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-accent/40 min-w-0"
           />
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
+            className="w-full sm:w-auto px-5 py-2.5 bg-accent text-bg-primary rounded-lg text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 shrink-0"
           >
             Send
           </button>

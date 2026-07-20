@@ -11,7 +11,7 @@ export function RadarDrawer() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Whales");
 
   return (
-    <section id="drawer" className="py-24 px-6 bg-bg-secondary/50">
+    <section id="drawer" className="py-16 sm:py-24 px-4 sm:px-6 bg-bg-secondary/50">
       <div className="max-w-4xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Institutional Radar</p>
@@ -39,9 +39,9 @@ export function RadarDrawer() {
               ))}
             </div>
 
-            <div className="p-4 overflow-x-auto">
+            <div className="p-3 sm:p-4 overflow-x-auto">
               {activeTab === "Whales" && (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[520px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Address</th>
@@ -68,7 +68,7 @@ export function RadarDrawer() {
               )}
 
               {activeTab === "ETF Flows" && (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[400px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Ticker</th>
@@ -91,7 +91,7 @@ export function RadarDrawer() {
               )}
 
               {activeTab === "Liquidations" && (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[480px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Exchange</th>

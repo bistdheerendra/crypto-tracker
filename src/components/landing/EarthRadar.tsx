@@ -68,12 +68,12 @@ export function EarthRadar() {
   }, []);
 
   return (
-    <section id="radar" className="py-24 px-6">
+    <section id="radar" className="py-16 sm:py-24 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
         <ScrollReveal>
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Earth Radar</p>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Live geolocated signals</h2>
-          <p className="text-text-muted max-w-xl mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Live geolocated signals</h2>
+          <p className="text-text-muted max-w-xl mb-8 sm:mb-12">
             Crypto news events mapped to their origin. Each pulse connects to our analysis pipeline.
           </p>
         </ScrollReveal>
@@ -87,7 +87,7 @@ export function EarthRadar() {
             <div className="space-y-3">
               {news.map((item) => (
                 <GlassCard key={item.id} className="!p-4 hover:border-accent/20 transition-colors">
-                  <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
                     <span className="text-xs text-text-muted font-mono-data">
                       {item.location} · {item.country} · {item.timeAgo}
                     </span>
