@@ -108,7 +108,9 @@ async function main(): Promise<void> {
     orderBy: { createdAt: "asc" },
   });
 
-  const skippedNoFeatures = verdicts.filter((v) => v.features === null).length;
+  type VerdictRow = (typeof verdicts)[number];
+
+  const skippedNoFeatures = verdicts.filter((v: VerdictRow) => v.features === null).length;
   if (skippedNoFeatures > 0) {
     console.warn(
       `Skipped ${skippedNoFeatures} resolved verdict(s) with no VerdictFeature row.`,
@@ -116,7 +118,7 @@ async function main(): Promise<void> {
   }
 
   const withFeatures = verdicts.filter(
-    (v): v is typeof v & { features: NonNullable<typeof v.features> } =>
+    (v: VerdictRow): v is VerdictRow & { features: NonNullable<VerdictRow["features"]> } =>
       v.features !== null,
   );
 
