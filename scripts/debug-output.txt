@@ -1,0 +1,29 @@
+﻿Total open verdicts: 23
+cmrubdcgl0 BTC/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubdcpg0 ETH/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubdcrx0 SOL/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubhzoh0 BTC/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubi19l0 BTC/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubi50j0 BTC/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubihja0 ETH/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubihlp0 SOL/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrubihp80 BTC/USDT LONG 2.6h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruby24u0 BTC/USDT LONG 2.4h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruby24u0 BTC/USDT LONG 2.4h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruby25o0 ETH/USDT LONG 2.4h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruby2fq0 SOL/USDT LONG 2.4h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruc0vyq0 BTC/USDT LONG 2.3h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruc0xhl0 BTC/USDT LONG 2.3h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruezeaj0 BTC/USDT LONG 1.0h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmruezg0m0 BTC/USDT LONG 0.9h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufjwvg0 SOL/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufjwwa0 ETH/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufjx5k0 BTC/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufk4d40 BTC/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufk7xu0 BTC/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+cmrufkfg90 BTC/USDT LONG 0.7h strict={"slHit":false,"tp1Hit":false,"tp2Hit":false} creation={"slHit":false,"tp1Hit":false,"tp2Hit":false}
+
+Would resolve (strict): 0
+Would resolve (incl creation candle): 0
+
+resolveOpenVerdicts returned: 0

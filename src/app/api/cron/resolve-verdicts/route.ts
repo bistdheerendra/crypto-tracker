@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   invalidateCache("track-record");
   invalidateLaneWeightCache();
 
-  return NextResponse.json({ resolved, at: new Date().toISOString() });
+  return NextResponse.json({ ...resolved, at: new Date().toISOString() });
 }
 
 export async function POST(req: NextRequest) {

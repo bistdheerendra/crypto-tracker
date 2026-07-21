@@ -5,6 +5,13 @@ import type { StoredVerdict, VerdictOutcome } from "../verdicts/types";
 const MIN_AGE_MS = 5 * 60 * 1000;
 const MAX_HOLD_MS = 48 * 60 * 60 * 1000;
 
+export type ResolveVerdictsSummary = {
+  totalOpen: number;
+  resolved: number;
+  skippedTooYoung: number;
+  errored: number;
+};
+
 function checkCandleOutcome(
   v: StoredVerdict,
   highs: number[],
@@ -134,20 +141,31 @@ function checkCandleOutcome(
   return null;
 }
 
-export async function resolveOpenVerdicts(): Promise<number> {
-  const open = (await getOpenVerdicts()).filter(
+export async function resolveOpenVerdicts(): Promise<ResolveVerdictsSummary> {
+  const allOpen = await getOpenVerdicts();
+  const totalOpen = allOpen.length;
+  const eligible = allOpen.filter(
     (v) => Date.now() - new Date(v.createdAt).getTime() >= MIN_AGE_MS
   );
+  const skippedTooYoung = totalOpen - eligible.length;
+
+  console.log("[resolve-verdicts] start", {
+    totalOpen,
+    skippedTooYoung,
+    eligible: eligible.length,
+  });
 
   let resolved = 0;
+  let errored = 0;
   const pairCache = new Map<string, Awaited<ReturnType<typeof getKlines>>>();
 
-  for (const v of open) {
+  for (const v of eligible) {
+    const cacheKey = `${v.pair}:${v.timeframe}`;
     try {
-      if (!pairCache.has(v.pair)) {
-        pairCache.set(v.pair, await getKlines(v.pair, v.timeframe, 200));
+      if (!pairCache.has(cacheKey)) {
+        pairCache.set(cacheKey, await getKlines(v.pair, v.timeframe, 200));
       }
-      const klines = pairCache.get(v.pair)!;
+      const klines = pairCache.get(cacheKey)!;
       const highs = klines.map((k) => parseFloat(String(k[2])));
       const lows = klines.map((k) => parseFloat(String(k[3])));
       const closes = klines.map((k) => parseFloat(String(k[4])));
@@ -157,11 +175,43 @@ export async function resolveOpenVerdicts(): Promise<number> {
       if (result) {
         await resolveVerdict(v.id, result);
         resolved++;
+        console.log("[resolve-verdicts] resolved", {
+          verdictId: v.id,
+          pair: v.pair,
+          timeframe: v.timeframe,
+          outcome: result.outcome,
+          outcomePrice: result.outcomePrice,
+          outcomeAt: result.outcomeAt,
+          rMultiple: result.rMultiple,
+        });
+      } else {
+        console.log("[resolve-verdicts] notResolvedYet", {
+          verdictId: v.id,
+          pair: v.pair,
+          timeframe: v.timeframe,
+          createdAt: v.createdAt,
+        });
       }
-    } catch {
-      // Skip verdicts we can't resolve without candle data
+    } catch (err) {
+      errored++;
+      console.error("[resolve-verdicts] error resolving verdict", {
+        verdictId: v.id,
+        pair: v.pair,
+        timeframe: v.timeframe,
+        createdAt: v.createdAt,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
     }
   }
 
-  return resolved;
+  const summary: ResolveVerdictsSummary = {
+    totalOpen,
+    resolved,
+    skippedTooYoung,
+    errored,
+  };
+  console.log("[resolve-verdicts] summary", summary);
+
+  return summary;
 }

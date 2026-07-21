@@ -12,6 +12,10 @@ const COINGECKO_IDS: Record<string, string> = {
   "PAXG/USDT": "pax-gold",
 };
 
+export function normalizeSymbolForBinance(symbol: string): string {
+  return symbol.replace("/", "");
+}
+
 async function fetchBinance(path: string) {
   let lastError: Error | null = null;
 
@@ -48,7 +52,7 @@ async function getPriceFromCoinGecko(symbol: string): Promise<number> {
 }
 
 export async function getPrice(symbol: string): Promise<number> {
-  const pair = symbol.replace("/", "");
+  const pair = normalizeSymbolForBinance(symbol);
 
   try {
     const data = await fetchBinance(`/ticker/price?symbol=${pair}`);
@@ -63,12 +67,12 @@ export async function getKlines(
   interval = "1h",
   limit = 100
 ): Promise<(string | number)[][]> {
-  const pair = symbol.replace("/", "");
+  const pair = normalizeSymbolForBinance(symbol);
   return fetchBinance(`/klines?symbol=${pair}&interval=${interval}&limit=${limit}`);
 }
 
 export async function get24hTicker(symbol: string) {
-  const pair = symbol.replace("/", "");
+  const pair = normalizeSymbolForBinance(symbol);
   return fetchBinance(`/ticker/24hr?symbol=${pair}`);
 }
 
