@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import { EtfSourceBadge } from "@/components/radar/EtfSourceBadge";
+import { RadarTabMeta } from "@/components/radar/RadarTabMeta";
+import { whaleDirectionClass, whaleDirectionLabel } from "@/components/radar/whaleDirection";
 import type { ETFFlow, Liquidation, WhaleTransaction } from "@/lib/types";
 
 const TABS = ["Whales", "ETF Flows", "Liquidations"] as const;
@@ -41,8 +44,17 @@ export default function RadarPage() {
             }`}
           >
             {tab}
+            {tab === "ETF Flows" && <EtfSourceBadge source={etf.meta.source} />}
           </button>
         ))}
+      </div>
+
+      <div className="flex justify-end mb-3">
+        <RadarTabMeta
+          meta={active.meta}
+          onRefresh={active.refresh}
+          loading={active.loading}
+        />
       </div>
 
       {active.error && (
@@ -83,8 +95,8 @@ export default function RadarPage() {
                       <td className="py-3 px-4">{w.chain}</td>
                       <td className="py-3 px-4 font-mono-data">{w.amount}</td>
                       <td className="py-3 px-4 font-mono-data">{w.usdValue}</td>
-                      <td className={`py-3 px-4 font-mono-data font-semibold ${w.direction === "in" ? "text-bull" : "text-bear"}`}>
-                        {w.direction.toUpperCase()}
+                      <td className={`py-3 px-4 font-mono-data font-semibold ${whaleDirectionClass(w.direction)}`}>
+                        {whaleDirectionLabel(w.direction)}
                       </td>
                       <td className="py-3 px-4 text-text-muted">{w.timeAgo}</td>
                     </tr>
@@ -100,7 +112,9 @@ export default function RadarPage() {
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Ticker</th>
                   <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-right py-3 px-4">Activity ($M)</th>
+                  <th className="text-right py-3 px-4">
+                    {etf.meta.source === "sosovalue" ? "Net Flow ($M)" : "Activity ($M)"}
+                  </th>
                   <th className="text-left py-3 px-4">Date</th>
                 </tr>
               </thead>
@@ -163,7 +177,7 @@ export default function RadarPage() {
       </GlassCard>
 
       <p className="text-xs text-text-muted mt-3">
-        Source: {TAB_TYPE[activeTab]} via live API · auto-refreshes
+        Source: {active.meta.source ?? TAB_TYPE[activeTab]} · auto-refreshes
       </p>
     </div>
   );

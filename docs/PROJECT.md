@@ -119,7 +119,7 @@ src/
   lib/
     analysis/                → 4 lanes + synthesis + structure levels
     backtest/                → Resolve, simulate, track record, weights
-    radar/                   → News, whales, liquidations, ETF proxy
+    radar/                   → News, whales, liquidations, ETF flows (SoSoValue + fallback)
     scenarios/               → Portfolio stress + correlation
     verdicts/                → Verdict store + ML feature capture
     db.ts                    → Prisma client (lazy; pg adapter)
@@ -278,18 +278,24 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 
 ### 6.4 Radar (`/app/radar` + landing drawer)
 
+**Full detail:** [`docs/INSTITUTIONAL-RADAR.md`](./INSTITUTIONAL-RADAR.md)
+
 **API:** `GET /api/radar?type=news|whales|liquidations|etf`
+
+Response includes `{ type, data, source, cached, fetchedAt }`.
 
 | Type | Source | Cache TTL (approx) |
 |------|--------|--------------------|
 | `news` | CoinDesk / CoinTelegraph / Decrypt RSS + keyword sentiment | ~60s |
-| `whales` | Blockchair BTC (≥50) / ETH (≥500) txs + Binance USD | ~120s |
-| `liquidations` | OKX public liquidation orders (BTC/ETH/SOL) | ~30s |
-| `etf` | Yahoo charts IBIT/FBTC/GBTC/ARKB/ETHA — **proxy** (`volume × price × %change`), true issuer flows nahi | ~300s |
+| `whales` | Blockchair BTC/ETH + Solana RPC (≥50 BTC / 500 ETH / 5000 SOL) + Binance USD; BTC direction best-effort | ~120s |
+| `liquidations` | OKX REST + Binance/Bybit WebSocket (BTC/ETH/SOL) | ~30s |
+| `etf` | SoSoValue real net flows (`SOSOVALUE_API_KEY`) → fallback Yahoo proxy | ~300s |
 
-Hook: `src/components/radar/useRadarFeed.ts` — poll + manual refresh.
+Cache: Upstash Redis (optional) ya in-memory fallback. Optional env: `SOSOVALUE_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 
-Libs: `src/lib/radar/news.ts`, `whales.ts`, `liquidations.ts`, `etf-flows.ts`, `utils.ts`.
+Hook: `src/components/radar/useRadarFeed.ts` — poll, `meta` (source/cached/fetchedAt), manual refresh.
+
+Libs: `src/lib/radar/` — `whales.ts`, `etf-flows.ts`, `liquidations.ts`, `providers/sosovalue.ts`, `utils.ts`, `format.ts`.
 
 ### 6.5 Backtest (`/app/backtest`)
 
@@ -358,7 +364,7 @@ Teen-step pipeline:
 | GET | `/api/market` | `symbol` | `{ symbol, price }` |
 | GET | `/api/klines` | `symbol`, `interval`, `limit` (max 500) | `{ candles: [{ time, open, high, low, close }] }` |
 | POST | `/api/copilot` | `{ message }` | `{ reply, symbol, price }` |
-| GET | `/api/radar` | `type` | `{ type, data, cached, source? }` |
+| GET | `/api/radar` | `type` | `{ type, data, source, cached, fetchedAt }` |
 | POST | `/api/backtest/simulate` | pair, dateRange, capital, risk, minTier… | Equity curve + trades + metrics |
 | GET | `/api/backtest/track-record` | — | Aggregate WR, lane accuracy, etc. |
 | GET | `/api/scenarios/correlation` | — | `{ matrix, cached, source }` |

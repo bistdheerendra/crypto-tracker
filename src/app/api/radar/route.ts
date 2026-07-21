@@ -12,12 +12,23 @@ const TTL_MS: Record<string, number> = {
   etf: 300_000,
 };
 
+interface CachedRadarPayload {
+  data: unknown;
+  source?: string;
+}
+
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "news";
   const cacheKey = `radar:${type}`;
-  const cached = getRadarCache<unknown>(cacheKey);
+  const cached = await getRadarCache<CachedRadarPayload>(cacheKey);
   if (cached) {
-    return NextResponse.json({ type, data: cached, cached: true });
+    return NextResponse.json({
+      type,
+      data: cached.data.data,
+      source: cached.data.source,
+      cached: true,
+      fetchedAt: cached.fetchedAt,
+    });
   }
 
   try {
@@ -31,22 +42,25 @@ export async function GET(req: NextRequest) {
         break;
       case "whales":
         data = await fetchWhaleTransactions();
-        source = "blockchair";
+        source = "blockchair+solana-rpc";
         break;
       case "liquidations":
         data = await fetchLiquidations();
-        source = "okx";
+        source = "okx+binance+bybit";
         break;
-      case "etf":
-        data = await fetchEtfFlows();
-        source = "yahoo-finance";
+      case "etf": {
+        const etfResult = await fetchEtfFlows();
+        data = etfResult.flows;
+        source = etfResult.source;
         break;
+      }
       default:
         return NextResponse.json({ error: "Unknown radar type" }, { status: 400 });
     }
 
-    setRadarCache(cacheKey, data, TTL_MS[type] ?? 60_000);
-    return NextResponse.json({ type, data, cached: false, source });
+    const fetchedAt = Date.now();
+    await setRadarCache(cacheKey, { data, source }, TTL_MS[type] ?? 60_000);
+    return NextResponse.json({ type, data, cached: false, source, fetchedAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Radar fetch failed";
     return NextResponse.json({ error: message }, { status: 503 });

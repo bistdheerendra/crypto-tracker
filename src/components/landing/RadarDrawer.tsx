@@ -4,6 +4,9 @@ import { useState } from "react";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import { EtfSourceBadge } from "@/components/radar/EtfSourceBadge";
+import { RadarTabMeta } from "@/components/radar/RadarTabMeta";
+import { whaleDirectionClass, whaleDirectionLabel } from "@/components/radar/whaleDirection";
 import type { ETFFlow, Liquidation, NewsItem, WhaleTransaction } from "@/lib/types";
 
 const TABS = ["Whales", "ETF Flows", "Liquidations", "Scenarios"] as const;
@@ -24,7 +27,7 @@ export function RadarDrawer() {
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-3">Institutional Radar</p>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Whales, flows & liquidations</h2>
           <p className="text-text-muted mb-8">
-            Live institutional data from Blockchair, Yahoo Finance, and OKX.
+            Live institutional data from Blockchair, SoSoValue, OKX, Binance, and Bybit.
           </p>
         </ScrollReveal>
 
@@ -42,9 +45,20 @@ export function RadarDrawer() {
                   }`}
                 >
                   {tab}
+                  {tab === "ETF Flows" && <EtfSourceBadge source={etf.meta.source} />}
                 </button>
               ))}
             </div>
+
+            {activeTab !== "Scenarios" && (
+              <div className="flex justify-end px-3 sm:px-4 py-2 border-b border-white/5">
+                <RadarTabMeta
+                  meta={active.meta}
+                  onRefresh={active.refresh}
+                  loading={active.loading}
+                />
+              </div>
+            )}
 
             <div className="p-3 sm:p-4 overflow-x-auto">
               {activeTab !== "Scenarios" && active.error && (
@@ -72,8 +86,8 @@ export function RadarDrawer() {
                         <td className="py-2.5 px-3 font-mono-data text-xs">{w.address}</td>
                         <td className="py-2.5 px-3 font-mono-data">{w.amount}</td>
                         <td className="py-2.5 px-3 font-mono-data">{w.usdValue}</td>
-                        <td className={`py-2.5 px-3 font-mono-data ${w.direction === "in" ? "text-bull" : "text-bear"}`}>
-                          {w.direction.toUpperCase()}
+                        <td className={`py-2.5 px-3 font-mono-data ${whaleDirectionClass(w.direction)}`}>
+                          {whaleDirectionLabel(w.direction)}
                         </td>
                         <td className="py-2.5 px-3 text-text-muted">{w.timeAgo}</td>
                       </tr>
@@ -88,7 +102,9 @@ export function RadarDrawer() {
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Ticker</th>
                       <th className="text-left py-2 px-3">Name</th>
-                      <th className="text-right py-2 px-3">Activity ($M)</th>
+                      <th className="text-right py-2 px-3">
+                        {etf.meta.source === "sosovalue" ? "Net Flow ($M)" : "Activity ($M)"}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

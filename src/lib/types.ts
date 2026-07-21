@@ -44,7 +44,7 @@ export interface WhaleTransaction {
   address: string;
   amount: string;
   usdValue: string;
-  direction: "in" | "out";
+  direction: "in" | "out" | "unknown";
   timeAgo: string;
   chain: string;
 }

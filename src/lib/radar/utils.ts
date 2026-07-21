@@ -1,37 +1,59 @@
-const store = new Map<string, { data: unknown; expiresAt: number }>();
+const memoryStore = new Map<string, { data: unknown; fetchedAt: number; expiresAt: number }>();
 
-export function getRadarCache<T>(key: string): T | null {
-  const entry = store.get(key);
+export interface RadarCacheEntry<T> {
+  data: T;
+  fetchedAt: number;
+}
+
+function useUpstash(): boolean {
+  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+async function getUpstashClient() {
+  const { Redis } = await import("@upstash/redis");
+  return new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  });
+}
+
+export async function getRadarCache<T>(key: string): Promise<RadarCacheEntry<T> | null> {
+  if (useUpstash()) {
+    try {
+      const redis = await getUpstashClient();
+      const raw = await redis.get<string>(key);
+      if (!raw) return null;
+      const entry = typeof raw === "string" ? (JSON.parse(raw) as RadarCacheEntry<T>) : (raw as RadarCacheEntry<T>);
+      return entry ?? null;
+    } catch {
+      // Fall through to memory store
+    }
+  }
+
+  const entry = memoryStore.get(key);
   if (!entry || Date.now() > entry.expiresAt) {
-    store.delete(key);
+    memoryStore.delete(key);
     return null;
   }
-  return entry.data as T;
+  return { data: entry.data as T, fetchedAt: entry.fetchedAt };
 }
 
-export function setRadarCache(key: string, data: unknown, ttlMs: number): void {
-  store.set(key, { data, expiresAt: Date.now() + ttlMs });
+export async function setRadarCache(key: string, data: unknown, ttlMs: number): Promise<void> {
+  const fetchedAt = Date.now();
+  const entry: RadarCacheEntry<unknown> = { data, fetchedAt };
+
+  if (useUpstash()) {
+    try {
+      const redis = await getUpstashClient();
+      const ttlSeconds = Math.max(1, Math.ceil(ttlMs / 1000));
+      await redis.set(key, JSON.stringify(entry), { ex: ttlSeconds });
+      return;
+    } catch {
+      // Fall through to memory store
+    }
+  }
+
+  memoryStore.set(key, { data, fetchedAt, expiresAt: fetchedAt + ttlMs });
 }
 
-export function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-export function truncateAddress(address: string, chars = 4): string {
-  if (address.length <= chars * 2 + 1) return address;
-  return `${address.slice(0, chars + 2)}…${address.slice(-chars)}`;
-}
-
-export function formatUsdCompact(value: number): string {
-  if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toFixed(0)}`;
-}
+export { formatTimeAgo, formatTimeAgoFromTimestamp, truncateAddress, formatUsdCompact } from "./format";
