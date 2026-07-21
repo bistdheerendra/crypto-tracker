@@ -1,0 +1,83 @@
+// DeepCurrent — durable verdicts + point-in-time ML features
+// Connection URLs live in prisma.config.ts (Prisma v7). Env vars: DATABASE_URL + DIRECT_URL.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  
+}
+
+model Verdict {
+  id                 String          @id @default(cuid())
+  pair               String
+  timeframe          String
+  direction          String
+  confidenceTier     String
+  entryPrice         Float
+  stopLoss           Float
+  takeProfit1        Float
+  takeProfit2        Float
+  laneBiasTechnical  String
+  laneBiasFlow       String
+  laneBiasNarrative  String
+  laneBiasMacro      String
+  createdAt          DateTime        @default(now())
+  outcome            String?
+  outcomePrice       Float?
+  outcomeAt          DateTime?
+  rMultiple          Float?
+  features           VerdictFeature?
+
+  @@index([pair, createdAt])
+  @@index([outcome])
+  @@index([createdAt])
+  @@map("verdicts")
+}
+
+/// Point-in-time raw lane inputs captured at verdict creation.
+/// Cannot be perfectly reconstructed later from klines alone.
+model VerdictFeature {
+  id                        String   @id @default(cuid())
+  verdictId                 String   @unique
+  verdict                   Verdict  @relation(fields: [verdictId], references: [id], onDelete: Cascade)
+
+  // Technical
+  ema50                     Float?
+  ema200                    Float?
+  rsi14                     Float?
+  priceDistanceToEma50Pct   Float?
+  distanceToNearestSwingPct Float?
+
+  // Flow
+  oiChangePct               Float?
+  fundingRate               Float?
+  longShortRatio            Float?
+  price24hChangePct         Float?
+
+  // Narrative
+  fearGreedIndex            Float?
+  globalMcapChangePct       Float?
+  trendingScore             Float?
+
+  // Macro
+  dxyChangePct              Float?
+  spxChangePct              Float?
+  goldChangePct             Float?
+
+  // Meta (duplicated for flat training extracts)
+  confidenceTier            String
+  laneAgreementCount        Int
+  pair                      String
+  timeframe                 String
+  hourOfDay                 Int
+  dayOfWeek                 Int
+
+  createdAt                 DateTime @default(now())
+
+  @@index([pair, createdAt])
+  @@map("verdict_features")
+}

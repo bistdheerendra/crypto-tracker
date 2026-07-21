@@ -38,9 +38,10 @@ export function ProgressRail() {
   return (
     <>
       {/* Desktop side rail */}
-      <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-end gap-0">
+      <div className="fixed right-6 top-1/2 z-40 hidden h-[calc(100dvh-8rem)] -translate-y-1/2 flex-col items-end justify-between lg:flex">
+        <div className="absolute right-[3px] top-1 bottom-1 w-px bg-white/8" />
         {STAGES.map((stage, i) => (
-          <div key={stage.id} className="flex items-center gap-3">
+          <div key={stage.id} className="relative z-10 flex items-center gap-3">
             <span
               className={`text-[10px] tracking-[0.2em] transition-colors duration-300 ${
                 i <= active ? "text-accent" : "text-text-muted/40"
@@ -53,9 +54,6 @@ export function ProgressRail() {
                 i <= active ? "bg-accent glow-accent" : "bg-white/10"
               }`}
             />
-            {i < STAGES.length - 1 && (
-              <div className="absolute right-[3px] w-px h-8 bg-white/8" style={{ top: `${i * 40 + 20}px` }} />
-            )}
           </div>
         ))}
       </div>

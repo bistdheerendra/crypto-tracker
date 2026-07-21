@@ -4,6 +4,13 @@ import { getDynamicLaneWeights } from "../backtest/lane-weights";
 import type { FlowMetrics } from "../binance-futures";
 import type { MacroSnapshot } from "../macro";
 import type { NarrativeSnapshot } from "../narrative";
+import type {
+  FlowRawFeatures,
+  LaneRunResult,
+  MacroRawFeatures,
+  NarrativeRawFeatures,
+  TechnicalRawFeatures,
+} from "../verdicts/features";
 import { computeStructureLevels, computeSwingLevels } from "./structure";
 
 const BIAS_SCORE: Record<Bias, number> = {
@@ -18,7 +25,7 @@ const TIER_SCORE: Record<Tier, number> = {
   LOW: 1,
 };
 
-export function synthesizeVerdict(
+export async function synthesizeVerdict(
   lanes: LaneOutput[],
   pair: string,
   timeframe: string,
@@ -26,12 +33,12 @@ export function synthesizeVerdict(
   atr: number,
   highs: number[],
   lows: number[]
-): Verdict {
+): Promise<Verdict> {
   let score = 0;
   let totalWeight = 0;
   let aligned = 0;
   const dominantBias = getDominantBias(lanes);
-  const { weights: laneWeights } = getDynamicLaneWeights();
+  const { weights: laneWeights } = await getDynamicLaneWeights();
 
   for (const lane of lanes) {
     const w = laneWeights[lane.lane] ?? 0.25;
@@ -109,7 +116,7 @@ export function runTechnicalLane(
   closes: number[],
   highs: number[],
   lows: number[]
-): LaneOutput {
+): LaneRunResult {
   const ema50 = closes.length >= 50 ? ema(closes, 50) : closes[closes.length - 1];
   const ema200 = closes.length >= 200 ? ema(closes, 200) : ema50;
   const rsi = computeRSI(closes);
@@ -118,27 +125,50 @@ export function runTechnicalLane(
   const bearish = price < ema50 && ema50 < ema200;
   const swings = computeSwingLevels(highs, lows);
 
+  const distSwingHighPct = Math.abs((price - swings.swingHigh) / price) * 100;
+  const distSwingLowPct = Math.abs((price - swings.swingLow) / price) * 100;
+  const raw: TechnicalRawFeatures = {
+    ema50,
+    ema200,
+    rsi14: rsi,
+    priceDistanceToEma50Pct: ema50 !== 0 ? ((price - ema50) / ema50) * 100 : 0,
+    distanceToNearestSwingPct: Math.min(distSwingHighPct, distSwingLowPct),
+  };
+
   return {
-    lane: "Technical",
-    badge: "T",
-    bias: bullish ? "BULL" : bearish ? "BEAR" : "MIXED",
-    tier: rsi > 70 || rsi < 30 ? "HIGH" : "MODERATE",
-    reasoning: [
-      `Price ${bullish ? "above" : bearish ? "below" : "near"} 50/200 EMA`,
-      `RSI(14) at ${rsi.toFixed(0)}`,
-      `Swing support ${swings.swingLow.toFixed(2)}, resistance ${swings.swingHigh.toFixed(2)}`,
-    ],
+    output: {
+      lane: "Technical",
+      badge: "T",
+      bias: bullish ? "BULL" : bearish ? "BEAR" : "MIXED",
+      tier: rsi > 70 || rsi < 30 ? "HIGH" : "MODERATE",
+      reasoning: [
+        `Price ${bullish ? "above" : bearish ? "below" : "near"} 50/200 EMA`,
+        `RSI(14) at ${rsi.toFixed(0)}`,
+        `Swing support ${swings.swingLow.toFixed(2)}, resistance ${swings.swingHigh.toFixed(2)}`,
+      ],
+    },
+    raw,
   };
 }
 
-export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneOutput {
+export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneRunResult {
+  const raw: FlowRawFeatures = {
+    oiChangePct: flow.available ? flow.oiChange24hPct : null,
+    fundingRate: flow.available ? flow.fundingRate : null,
+    longShortRatio: flow.available ? flow.longShortRatio : null,
+    price24hChangePct: priceChange24hPct,
+  };
+
   if (!flow.available) {
     return {
-      lane: "Flow",
-      badge: "F",
-      bias: "MIXED",
-      tier: "LOW",
-      reasoning: ["Futures flow data unavailable for this pair"],
+      output: {
+        lane: "Flow",
+        badge: "F",
+        bias: "MIXED",
+        tier: "LOW",
+        reasoning: ["Futures flow data unavailable for this pair"],
+      },
+      raw,
     };
   }
 
@@ -160,26 +190,49 @@ export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneO
       : "MODERATE";
 
   return {
-    lane: "Flow",
-    badge: "F",
-    bias,
-    tier,
-    reasoning: [
-      `OI ${flow.oiChange24hPct >= 0 ? "+" : ""}${flow.oiChange24hPct.toFixed(1)}% (24h)`,
-      `Funding ${flow.fundingRate.toFixed(4)}%`,
-      `Long/short ratio ${flow.longShortRatio.toFixed(2)}`,
-    ],
+    output: {
+      lane: "Flow",
+      badge: "F",
+      bias,
+      tier,
+      reasoning: [
+        `OI ${flow.oiChange24hPct >= 0 ? "+" : ""}${flow.oiChange24hPct.toFixed(1)}% (24h)`,
+        `Funding ${flow.fundingRate.toFixed(4)}%`,
+        `Long/short ratio ${flow.longShortRatio.toFixed(2)}`,
+      ],
+    },
+    raw,
   };
 }
 
-export function runNarrativeLane(narrative: NarrativeSnapshot): LaneOutput {
+export function runNarrativeLane(
+  narrative: NarrativeSnapshot,
+  pair = "BTC/USDT"
+): LaneRunResult {
+  const base = pair.split("/")[0]?.toUpperCase() ?? "";
+  const inTrending = narrative.trendingCoins.some((c) => c.toUpperCase() === base);
+  // 0–1 heat: base in trending list, plus mild lift from list size
+  const trendingScore = Math.min(
+    1,
+    (inTrending ? 0.7 : 0) + narrative.trendingCoins.length * 0.1
+  );
+
+  const raw: NarrativeRawFeatures = {
+    fearGreedIndex: narrative.fearGreed,
+    globalMcapChangePct: narrative.globalMarketCapChange24hPct,
+    trendingScore,
+  };
+
   if (!narrative.available) {
     return {
-      lane: "Narrative",
-      badge: "N",
-      bias: "MIXED",
-      tier: "LOW",
-      reasoning: ["Narrative data sources unavailable"],
+      output: {
+        lane: "Narrative",
+        badge: "N",
+        bias: "MIXED",
+        tier: "LOW",
+        reasoning: ["Narrative data sources unavailable"],
+      },
+      raw,
     };
   }
 
@@ -225,22 +278,34 @@ export function runNarrativeLane(narrative: NarrativeSnapshot): LaneOutput {
   }
 
   return {
-    lane: "Narrative",
-    badge: "N",
-    bias,
-    tier,
-    reasoning: reasoning.slice(0, 3),
+    output: {
+      lane: "Narrative",
+      badge: "N",
+      bias,
+      tier,
+      reasoning: reasoning.slice(0, 3),
+    },
+    raw,
   };
 }
 
-export function runMacroLane(macro: MacroSnapshot): LaneOutput {
+export function runMacroLane(macro: MacroSnapshot): LaneRunResult {
+  const raw: MacroRawFeatures = {
+    dxyChangePct: macro.dxyChange24hPct,
+    spxChangePct: macro.spxChange24hPct,
+    goldChangePct: macro.goldChange24hPct,
+  };
+
   if (!macro.available) {
     return {
-      lane: "Macro",
-      badge: "M",
-      bias: "MIXED",
-      tier: "LOW",
-      reasoning: ["Macro market data unavailable"],
+      output: {
+        lane: "Macro",
+        badge: "M",
+        bias: "MIXED",
+        tier: "LOW",
+        reasoning: ["Macro market data unavailable"],
+      },
+      raw,
     };
   }
 
@@ -271,15 +336,18 @@ export function runMacroLane(macro: MacroSnapshot): LaneOutput {
     v == null ? "n/a" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
   return {
-    lane: "Macro",
-    badge: "M",
-    bias,
-    tier,
-    reasoning: [
-      `DXY ${fmt(macro.dxyChange24hPct)}`,
-      `S&P 500 ${fmt(macro.spxChange24hPct)}`,
-      `Gold ${fmt(macro.goldChange24hPct)}`,
-    ],
+    output: {
+      lane: "Macro",
+      badge: "M",
+      bias,
+      tier,
+      reasoning: [
+        `DXY ${fmt(macro.dxyChange24hPct)}`,
+        `S&P 500 ${fmt(macro.spxChange24hPct)}`,
+        `Gold ${fmt(macro.goldChange24hPct)}`,
+      ],
+    },
+    raw,
   };
 }
 

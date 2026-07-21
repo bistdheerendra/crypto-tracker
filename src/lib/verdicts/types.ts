@@ -1,4 +1,5 @@
 import type { Bias, Direction, LaneOutput, Tier } from "../types";
+import type { VerdictFeaturePayload } from "./features";
 
 export type VerdictOutcome = "tp1_hit" | "tp2_hit" | "sl_hit" | "expired" | "open";
 
@@ -25,6 +26,8 @@ export interface StoredVerdict {
   outcomePrice: number | null;
   outcomeAt: string | null;
   rMultiple: number | null;
+  /** Present when saved with Stage-1 feature capture; omitted from older in-memory rows. */
+  features?: VerdictFeaturePayload | null;
 }
 
 export function laneBiasesFromLanes(lanes: LaneOutput[]): LaneBiases {

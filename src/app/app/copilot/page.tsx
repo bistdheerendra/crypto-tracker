@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 
+const AI_MODELS = [
+  { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
+  { id: "gpt-5.6", label: "GPT-5.6" },
+] as const;
+
 interface Message {
   role: "user" | "bot";
   text: string;
@@ -17,6 +22,7 @@ export default function CopilotPage() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(AI_MODELS[0].id);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +37,7 @@ export default function CopilotPage() {
       const res = await fetch("/api/copilot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userMsg }),
+        body: JSON.stringify({ message: userMsg, model: selectedModel }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -53,9 +59,32 @@ export default function CopilotPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 flex flex-col min-h-[calc(100dvh-3.5rem)] lg:min-h-screen">
-      <div className="mb-4 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold mb-1">Copilot</h1>
-        <p className="text-text-muted text-sm">Crypto-trading Q&A with live price context.</p>
+      <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold mb-1">Copilot</h1>
+          <p className="text-text-muted text-sm">Crypto-trading Q&amp;A with live price context.</p>
+        </div>
+        <div className="w-full sm:w-auto">
+          <label
+            htmlFor="copilot-model"
+            className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5 block"
+          >
+            AI model
+          </label>
+          <select
+            id="copilot-model"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={loading}
+            className="w-full sm:min-w-48 bg-bg-card border border-white/8 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {AI_MODELS.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <GlassCard className="flex-1 flex flex-col !p-0 overflow-hidden min-h-0">

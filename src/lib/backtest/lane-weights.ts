@@ -17,14 +17,14 @@ const LANE_KEY_MAP: Record<string, keyof ReturnType<typeof computeTrackRecord>["
 
 let cachedWeights: { weights: Record<string, number>; updatedAt: string } | null = null;
 
-export function getDynamicLaneWeights(): {
+export async function getDynamicLaneWeights(): Promise<{
   weights: Record<string, number>;
   updatedAt: string;
   source: "dynamic" | "default";
-} {
+}> {
   if (cachedWeights) return { ...cachedWeights, source: "dynamic" };
 
-  const stats = computeTrackRecord(getAllVerdicts());
+  const stats = computeTrackRecord(await getAllVerdicts());
   const resolved = stats.resolvedCount;
 
   if (resolved < 30) {

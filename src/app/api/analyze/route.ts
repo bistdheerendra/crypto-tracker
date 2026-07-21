@@ -12,12 +12,24 @@ import {
 } from "@/lib/analysis/synthesizer";
 import { invalidateCache } from "@/lib/backtest/cache";
 import { invalidateLaneWeightCache } from "@/lib/backtest/lane-weights";
+import {
+  buildVerdictFeatures,
+  type FlowRawFeatures,
+  type MacroRawFeatures,
+  type NarrativeRawFeatures,
+  type TechnicalRawFeatures,
+  type VerdictFeaturePayload,
+} from "@/lib/verdicts/features";
 import { saveVerdict } from "@/lib/verdicts/store";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
-function persistVerdict(verdict: Verdict, lanes: LaneOutput[]) {
+async function persistVerdict(
+  verdict: Verdict,
+  lanes: LaneOutput[],
+  features: VerdictFeaturePayload | null
+) {
   if (verdict.direction !== "NEUTRAL") {
-    saveVerdict(verdict, lanes);
+    await saveVerdict(verdict, lanes, features);
     invalidateCache("track-record");
     invalidateLaneWeightCache();
   }
@@ -52,16 +64,34 @@ export async function GET(req: NextRequest) {
     const lows = klines.map((k) => parseFloat(String(k[3])));
     const atr = computeATR(highs, lows, closes);
 
-    const lanes = [
-      runTechnicalLane(closes, highs, lows),
-      runFlowLane(flow, narrative.priceChange24hPct),
-      runNarrativeLane(narrative),
-      runMacroLane(macro),
+    const techRun = runTechnicalLane(closes, highs, lows);
+    const flowRun = runFlowLane(flow, narrative.priceChange24hPct);
+    const narrRun = runNarrativeLane(narrative, pair);
+    const macroRun = runMacroLane(macro);
+
+    const lanes: LaneOutput[] = [
+      techRun.output,
+      flowRun.output,
+      narrRun.output,
+      macroRun.output,
     ];
 
-    const verdict = synthesizeVerdict(lanes, pair, timeframe, price, atr, highs, lows);
-    persistVerdict(verdict, lanes);
+    const verdict = await synthesizeVerdict(lanes, pair, timeframe, price, atr, highs, lows);
 
+    const features = buildVerdictFeatures({
+      pair,
+      timeframe,
+      confidenceTier: verdict.tier,
+      lanes,
+      technical: techRun.raw as TechnicalRawFeatures | null,
+      flow: flowRun.raw as FlowRawFeatures | null,
+      narrative: narrRun.raw as NarrativeRawFeatures | null,
+      macro: macroRun.raw as MacroRawFeatures | null,
+    });
+
+    await persistVerdict(verdict, lanes, features);
+
+    // API response shape unchanged — raw features are persisted only, not returned.
     return NextResponse.json({
       lanes,
       verdict,

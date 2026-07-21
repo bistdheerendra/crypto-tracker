@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   } = body;
 
   const { from, to } = parseDateRange(dateRange, customFrom, customTo);
-  const verdicts = queryVerdicts({
+  const verdicts = await queryVerdicts({
     pair,
     from,
     to,

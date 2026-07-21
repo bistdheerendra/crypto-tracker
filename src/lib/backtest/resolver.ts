@@ -135,7 +135,7 @@ function checkCandleOutcome(
 }
 
 export async function resolveOpenVerdicts(): Promise<number> {
-  const open = getOpenVerdicts().filter(
+  const open = (await getOpenVerdicts()).filter(
     (v) => Date.now() - new Date(v.createdAt).getTime() >= MIN_AGE_MS
   );
 
@@ -155,7 +155,7 @@ export async function resolveOpenVerdicts(): Promise<number> {
 
       const result = checkCandleOutcome(v, highs, lows, closes, timestamps);
       if (result) {
-        resolveVerdict(v.id, result);
+        await resolveVerdict(v.id, result);
         resolved++;
       }
     } catch {

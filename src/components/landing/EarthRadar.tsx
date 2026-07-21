@@ -3,6 +3,7 @@
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import { GlobeScene } from "@/components/landing/GlobeScene";
 import type { NewsItem } from "@/lib/types";
 
 const sentimentColors = {
@@ -10,48 +11,6 @@ const sentimentColors = {
   bearish: "text-bear bg-bear/10 border-bear/20",
   neutral: "text-mixed bg-mixed/10 border-mixed/20",
 };
-
-function GlobeSVG({ dots }: { dots: NewsItem[] }) {
-  return (
-    <div className="relative w-full max-w-md mx-auto aspect-square">
-      <svg viewBox="0 0 400 400" className="w-full h-full animate-spin-slow">
-        <defs>
-          <radialGradient id="globeGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#0d1224" />
-            <stop offset="100%" stopColor="#03060f" />
-          </radialGradient>
-        </defs>
-        <circle cx="200" cy="200" r="160" fill="url(#globeGrad)" stroke="rgba(62,166,255,0.2)" strokeWidth="1" />
-        {[0, 30, 60, 90, 120, 150].map((angle) => (
-          <ellipse
-            key={angle}
-            cx="200"
-            cy="200"
-            rx="160"
-            ry={60}
-            fill="none"
-            stroke="rgba(255,255,255,0.04)"
-            strokeWidth="0.5"
-            transform={`rotate(${angle} 200 200)`}
-          />
-        ))}
-        <ellipse cx="200" cy="200" rx="160" ry="160" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-        {dots.map((item) => {
-          const x = 200 + (item.lng / 180) * 140;
-          const y = 200 - (item.lat / 90) * 120;
-          const color =
-            item.sentiment === "bullish" ? "#2ee6a8" : item.sentiment === "bearish" ? "#ff5c72" : "#f5b94a";
-          return (
-            <g key={item.id}>
-              <circle cx={x} cy={y} r="8" fill={color} opacity="0.2" className="pulse-dot" />
-              <circle cx={x} cy={y} r="3" fill={color} />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
 
 export function EarthRadar() {
   const { data: news, loading, error } = useRadarFeed<NewsItem>("news", 60_000);
@@ -75,7 +34,9 @@ export function EarthRadar() {
 
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <ScrollReveal delay={0.1}>
-            <GlobeSVG dots={news.slice(0, 8)} />
+            <div className="relative mx-auto aspect-square w-full max-w-xl" role="img" aria-label="Interactive live global crypto news map">
+              <GlobeScene dots={news.slice(0, 8)} />
+            </div>
           </ScrollReveal>
 
           <ScrollReveal delay={0.2}>

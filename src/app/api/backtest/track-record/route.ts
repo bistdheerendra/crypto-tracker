@@ -11,7 +11,7 @@ export async function GET() {
     return NextResponse.json({ ...cached, cached: true });
   }
 
-  const stats = computeTrackRecord(getAllVerdicts());
+  const stats = computeTrackRecord(await getAllVerdicts());
   setCache(CACHE_KEY, stats, TRACK_RECORD_TTL_MS);
   return NextResponse.json({ ...stats, cached: false });
 }
