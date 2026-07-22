@@ -23,7 +23,7 @@ export function Delivery() {
                 <Send className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Dheerendra Intelligence Bot</p>
+                <p className="text-sm font-semibold">Dheeru_Crypto AI</p>
                 <p className="text-xs text-text-muted">bot</p>
               </div>
             </div>

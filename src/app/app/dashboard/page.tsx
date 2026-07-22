@@ -8,20 +8,12 @@ import { TierPill } from "@/components/ui/TierPill";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
 import type { NewsItem, Verdict } from "@/lib/types";
 
-import { DASHBOARD_PAIRS, TRACKED_PAIRS } from "@/lib/market/constants";
-
-const TIMEFRAMES = [
-  { label: "15m", value: "15m" },
-  { label: "30m", value: "30m" },
-  { label: "1h", value: "1h" },
-  { label: "4h", value: "4h" },
-  { label: "1D", value: "1d" },
-] as const;
+import { DASHBOARD_PAIRS, TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 
 export default function DashboardPage() {
   const [verdicts, setVerdicts] = useState<Verdict[]>([]);
   const [prices, setPrices] = useState<Record<string, number | null>>({});
-  const [timeframe, setTimeframe] = useState("1h");
+  const [timeframe, setTimeframe] = useState<string>("1h");
   const [loadingVerdicts, setLoadingVerdicts] = useState(true);
   const {
     data: news,
@@ -98,18 +90,18 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h2 className="text-lg font-semibold">Latest Verdicts</h2>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-              {TIMEFRAMES.map((tf) => (
+              {TRACKED_TIMEFRAMES.map((tf) => (
                 <button
-                  key={tf.value}
+                  key={tf}
                   type="button"
-                  onClick={() => setTimeframe(tf.value)}
+                  onClick={() => setTimeframe(tf)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono-data whitespace-nowrap transition-colors ${
-                    timeframe === tf.value
+                    timeframe === tf
                       ? "bg-accent/15 text-accent border border-accent/30"
                       : "text-text-muted hover:text-text-primary bg-white/5 border border-transparent"
                   }`}
                 >
-                  {tf.label}
+                  {tf === "1d" ? "1D" : tf}
                 </button>
               ))}
             </div>

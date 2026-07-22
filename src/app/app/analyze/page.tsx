@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
-import { TRACKED_PAIRS } from "@/lib/market/constants";
+import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
 const badgeColors: Record<string, string> = {
@@ -74,7 +74,7 @@ export default function AnalyzePage() {
               onChange={(e) => setTimeframe(e.target.value)}
               className="w-full bg-bg-card border border-white/8 rounded-lg px-4 py-2.5 text-sm font-mono-data text-text-primary focus:outline-none focus:border-accent/40"
             >
-              {["15m", "1h", "4h", "1d"].map((t) => (
+              {TRACKED_TIMEFRAMES.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>

@@ -1,5 +1,6 @@
 export const TIMEFRAME_OPTIONS = [
   { label: "15m", interval: "15", apiTimeframe: "15m" },
+  { label: "30m", interval: "30", apiTimeframe: "30m" },
   { label: "1h", interval: "60", apiTimeframe: "1h" },
   { label: "4h", interval: "240", apiTimeframe: "4h" },
   { label: "1D", interval: "D", apiTimeframe: "1d" },
