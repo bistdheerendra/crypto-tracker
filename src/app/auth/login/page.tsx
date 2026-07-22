@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -18,9 +19,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-md">
-        <Link href="/" className="font-bold text-xl mb-8 block">
-          Dheerendra <span className="text-accent">Intelligence</span>
-        </Link>
+        <BrandLogo href="/" size="lg" variant="stacked" className="mb-8" />
         <h1 className="text-2xl font-bold mb-2">Welcome back</h1>
         <p className="text-text-muted text-sm mb-8">Sign in to access your trading intelligence dashboard.</p>
 

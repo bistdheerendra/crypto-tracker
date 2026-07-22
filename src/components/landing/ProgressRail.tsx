@@ -44,14 +44,14 @@ export function ProgressRail() {
           <div key={stage.id} className="relative z-10 flex items-center gap-3">
             <span
               className={`text-[10px] tracking-[0.2em] transition-colors duration-300 ${
-                i <= active ? "text-accent" : "text-text-muted/40"
+                i <= active ? "text-mixed" : "text-text-muted/40"
               }`}
             >
               {stage.label}
             </span>
             <div
               className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                i <= active ? "bg-accent glow-accent" : "bg-white/10"
+                i <= active ? "bg-mixed shadow-[0_0_12px_rgba(245,185,74,0.45)]" : "bg-white/10"
               }`}
             />
           </div>
@@ -65,7 +65,7 @@ export function ProgressRail() {
             <span
               key={stage.id}
               className={`text-[8px] tracking-wider transition-colors ${
-                i <= active ? "text-accent" : "text-text-muted/40"
+                i <= active ? "text-mixed" : "text-text-muted/40"
               }`}
             >
               {stage.label}

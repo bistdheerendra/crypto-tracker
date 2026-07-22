@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
-import { GlobeScene } from "@/components/landing/GlobeScene";
+import { GlobeStatic } from "@/components/landing/GlobeStatic";
 import type { NewsItem } from "@/lib/types";
+
+const GlobeScene = dynamic(
+  () =>
+    import("@/components/landing/GlobeScene").then((m) => m.GlobeScene),
+  { ssr: false, loading: () => <GlobeStatic /> }
+);
 
 const sentimentColors = {
   bullish: "text-bull bg-bull/10 border-bull/20",
@@ -12,8 +20,33 @@ const sentimentColors = {
   neutral: "text-mixed bg-mixed/10 border-mixed/20",
 };
 
+/** Prefer static globe on small viewports or when the user asks for less motion. */
+function usePreferStaticGlobe() {
+  // Start static to avoid loading Three.js before we know the viewport / a11y prefs.
+  const [preferStatic, setPreferStatic] = useState(true);
+
+  useEffect(() => {
+    const mqWidth = window.matchMedia("(max-width: 767px)");
+    const mqMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => {
+      setPreferStatic(mqWidth.matches || mqMotion.matches);
+    };
+    update();
+    mqWidth.addEventListener("change", update);
+    mqMotion.addEventListener("change", update);
+    return () => {
+      mqWidth.removeEventListener("change", update);
+      mqMotion.removeEventListener("change", update);
+    };
+  }, []);
+
+  return preferStatic;
+}
+
 export function EarthRadar() {
   const { data: news, loading, error } = useRadarFeed<NewsItem>("news", 60_000);
+  const preferStatic = usePreferStaticGlobe();
+  const dots = news.slice(0, 8);
 
   return (
     <section id="radar" className="py-16 sm:py-24 px-4 sm:px-6">
@@ -34,8 +67,16 @@ export function EarthRadar() {
 
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <ScrollReveal delay={0.1}>
-            <div className="relative mx-auto aspect-square w-full max-w-xl" role="img" aria-label="Interactive live global crypto news map">
-              <GlobeScene dots={news.slice(0, 8)} />
+            <div
+              className="relative mx-auto aspect-square w-full max-w-xl"
+              role="img"
+              aria-label="Interactive live global crypto news map"
+            >
+              {preferStatic ? (
+                <GlobeStatic />
+              ) : (
+                <GlobeScene dots={dots} />
+              )}
             </div>
           </ScrollReveal>
 

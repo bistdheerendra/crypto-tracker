@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
+import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
@@ -124,7 +125,10 @@ export default function AnalyzePage() {
         <GlassCard glow="accent" className="!p-4 sm:!p-6 lg:!p-8">
           <p className="text-xs tracking-[0.3em] text-accent uppercase mb-4">Synthesized Verdict</p>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
-            <span className="font-mono-data text-lg sm:text-xl font-semibold">{verdict.pair} · {verdict.timeframe}</span>
+            <span className="flex items-center gap-2">
+              <CoinIcon symbol={pairBaseSymbol(verdict.pair)} size={24} className="ring-1 ring-white/15" />
+              <span className="font-mono-data text-lg sm:text-xl font-semibold">{verdict.pair} · {verdict.timeframe}</span>
+            </span>
             <TierPill tier={verdict.tier} />
             <span className={`px-3 py-1 rounded border text-sm font-bold font-mono-data ${
               verdict.direction === "LONG" ? "bg-bull/15 text-bull border-bull/30" :
@@ -133,6 +137,11 @@ export default function AnalyzePage() {
             }`}>
               {verdict.direction}
             </span>
+            {verdict.direction === "NEUTRAL" && (
+              <span className="px-3 py-1 rounded border border-mixed/30 bg-mixed/10 text-mixed text-sm font-bold font-mono-data">
+                NO TRADE
+              </span>
+            )}
             <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">

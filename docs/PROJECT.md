@@ -1,33 +1,58 @@
-# DeepCurrent — Project Documentation
+# DeepCurrent — Complete Project Documentation
 
-> Crypto trading intelligence app. Repo name: **deepcurrent**. UI brand: **Dheerendra Intelligence**.
+> Crypto trading intelligence app. Repo / package: **deepcurrent**. UI brand: **Dheerendra Intelligence**.  
+> Yeh document poora system explain karta hai — architecture, features, data flow, APIs, setup.
+
+**Related:** [Institutional Radar deep-dive](./INSTITUTIONAL-RADAR.md)
+
+---
+
+## 0. Short summary (Hinglish)
+
+DeepCurrent ek **Next.js** web app hai jo traders ko sirf chart nahi dikhata — **market move ke peeche ka cause** batata hai.
+
+**Kaise kaam karta hai (ek line):**
+
+1. Char independent lanes chalte hain → Technical, Flow, Narrative, Macro  
+2. Unke scores ko **weighted synthesis** se ek **Verdict** banaya jata hai (LONG / SHORT / NEUTRAL + SL/TP)  
+3. Saath mein Radar (whales/ETF/liquidations/news), Backtest, Scenarios, aur Copilot milte hain  
+
+**Disclaimer:** Informational tool only — financial advice nahi. Pricing / paywall / tokens nahi.
 
 ---
 
 ## 1. Project kya hai?
 
-DeepCurrent ek **Next.js** app hai jo traders ko sirf price chart nahi, balki **market move ke peeche ka cause** dikhata hai.
+### Problem
 
-**Core idea:**
-- Char independent analysis lanes chalao (Technical, Flow, Narrative, Macro)
-- Unko **ek synthesized verdict** mein jodo — direction, confidence tier, entry / stop-loss / take-profit
-- Saath mein Radar, Backtest, Scenarios, aur Copilot do
-- Pricing / paywall / tokens nahi
+Traders usually alag-alag sources pe depend karte hain: chart indicators, futures positioning, news/sentiment, macro (DXY/SPX/Gold). Inko manually jodna mushkil hai.
 
-**Disclaimer:** Informational tool only — financial advice nahi.
+### Solution
+
+DeepCurrent ek hi pipeline mein sab jodta hai:
+
+| Layer | Kya milta hai |
+|-------|----------------|
+| **Analyze / Charts / Dashboard** | 4-lane analysis + synthesized trade idea |
+| **Radar** | Institutional pulse — whales, ETF flows, liquidations, news |
+| **Backtest** | Verdicts save → resolve → win rate / equity simulator |
+| **Scenarios** | “Agar BTC −10%?” portfolio stress test |
+| **Copilot** | Chat UI + live price context (rule-based replies) |
 
 ### Stack
 
 | Layer | Tech |
 |--------|------|
-| Framework | Next.js 16 (App Router) |
-| UI | React 19, Tailwind CSS 4, Framer Motion, Lucide |
-| Charts | lightweight-charts, Recharts |
+| Framework | Next.js **16.2** (App Router) |
+| UI | React **19**, Tailwind CSS **4**, Framer Motion, Lucide |
+| Charts | `lightweight-charts` (candles), Recharts (equity curve) |
 | 3D (landing) | Three.js |
-| Database | PostgreSQL (Supabase) via Prisma 7 + `@prisma/adapter-pg` |
+| Database | PostgreSQL (Supabase) via **Prisma 7** + `@prisma/adapter-pg` |
+| Optional cache | Upstash Redis (radar) |
 | Language | TypeScript |
+| Deploy | Vercel (`vercel.json` daily cron fallback + external cron-job.org for frequent runs) |
 
-Scripts (`package.json`): `dev`, `build`, `start`, `lint`, `db:generate`, `db:migrate`, `db:push`, `db:studio`.
+**Scripts:** `dev`, `build`, `start`, `lint`, `db:generate`, `db:migrate`, `db:push`, `db:studio`, `extract-training-data`.
 
 ---
 
@@ -52,7 +77,7 @@ flowchart TB
 
   subgraph Lib["src/lib"]
     Synth["analysis/synthesizer"]
-    Store["verdicts/store (postgres | memory)"]
+    Store["verdicts/store"]
     RadarLib["radar/*"]
     BT["backtest/*"]
     Scen["scenarios/*"]
@@ -66,6 +91,7 @@ flowchart TB
     Blockchair
     OKX
     CoinGecko
+    SoSoValue
   end
 
   subgraph DB["Postgres (Supabase)"]
@@ -78,11 +104,31 @@ flowchart TB
   Store --> VerdictsTable
   Store --> FeaturesTable
   Analyze --> Binance & Futures & Yahoo & CoinGecko
-  Radar --> RadarLib --> RSS & Blockchair & OKX & Yahoo
+  Radar --> RadarLib --> RSS & Blockchair & OKX & Yahoo & SoSoValue
   Cron --> BT --> Store & Binance
   Backtest --> BT --> Store
   Corr --> Scen --> Binance
   Copilot --> Binance
+```
+
+### Request lifecycle (Analyze — product ka heart)
+
+```mermaid
+sequenceDiagram
+  participant UI as Analyze / Dashboard / Charts
+  participant API as GET /api/analyze
+  participant Ext as Market APIs
+  participant Synth as synthesizer + structure
+  participant Store as verdicts/store
+
+  UI->>API: pair + timeframe
+  API->>Ext: parallel: klines, price, flow, narrative, macro
+  Ext-->>API: snapshots
+  API->>Synth: 4 lanes → weighted verdict + SL/TP
+  alt not NEUTRAL
+    API->>Store: saveVerdict + features
+  end
+  API-->>UI: lanes, verdict, price, dataSources
 ```
 
 ---
@@ -91,47 +137,54 @@ flowchart TB
 
 ```
 prisma/
-  schema.prisma            → Verdict + VerdictFeature models
-  migrations/              → Applied SQL migrations (e.g. init_verdicts)
-prisma.config.ts           → Prisma v7 CLI config (DIRECT_URL for migrations)
+  schema.prisma              → Verdict + VerdictFeature
+  migrations/                → SQL migrations (init_verdicts)
+prisma.config.ts             → Prisma v7 CLI (DIRECT_URL for migrations)
+vercel.json                  → Daily Vercel cron fallback (resolve + generate); frequent schedule via cron-job.org
+.env.example                 → Env templates
 
 src/
-  generated/prisma/        → Prisma client (generated; do not edit)
+  generated/prisma/          → Generated Prisma client (do not edit)
   app/
     page.tsx                 → Marketing landing
     layout.tsx               → Root layout (fonts, metadata)
     auth/login|signup        → Mock auth
-    privacy|terms            → Legal pages
+    privacy|terms            → Legal
     app/                     → Product shell (AppShell)
       dashboard|analyze|charts|backtest|copilot|radar|scenarios|settings
     api/                     → Route handlers
   components/
-    landing/                 → Homepage sections
+    landing/                 → Homepage sections (+ Three.js globe)
     app/AppShell.tsx         → Sidebar nav
     charts/                  → Live candles + VerdictCard
     backtest/                → Simulator UI
     scenarios/               → Stress test UI
-    radar/                   → useRadarFeed hook
-    ui/                      → GlassCard, BiasPill, TierPill, etc.
+    radar/                   → useRadarFeed + meta UI
+    ui/                      → GlassCard, BiasPill, TierPill, BrandLogo, …
   hooks/
     useLiveAnalysis.ts
     useCorrelationMatrix.ts
   lib/
     analysis/                → 4 lanes + synthesis + structure levels
-    backtest/                → Resolve, simulate, track record, weights
-    radar/                   → News, whales, liquidations, ETF flows (SoSoValue + fallback)
+    backtest/                → Resolve, simulate, track record, lane weights
+    radar/                   → News, whales, liquidations, ETF (SoSoValue + fallback)
     scenarios/               → Portfolio stress + correlation
     verdicts/                → Verdict store + ML feature capture
-    db.ts                    → Prisma client (lazy; pg adapter)
+    market/constants.ts      → Tracked pairs + timeframes
+    db.ts                    → Lazy Prisma + pg adapter
     binance.ts               → Spot REST + indicators
     binance-futures.ts       → OI, funding, L/S
-    macro.ts                 → Yahoo macro snapshots
-    narrative.ts             → Fear & Greed + CoinGecko narrative
+    macro.ts                 → Yahoo macro
+    narrative.ts             → Fear & Greed + CoinGecko
     tradingview.ts           → Chart helpers / pair prefs
-    market/constants.ts      → Tracked pairs
     types.ts                 → Shared domain types
-    fetch-utils.ts           → Timed fetch helper
+  scripts/                   → extract-training-data, debug helpers
+docs/
+  PROJECT.md                 → Yeh file
+  INSTITUTIONAL-RADAR.md     → Radar deep dive
 ```
+
+Path alias: `@/*` → `./src/*`.
 
 ---
 
@@ -147,9 +200,11 @@ src/
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of service |
 
+Root layout (`src/app/layout.tsx`): Inter + JetBrains Mono, dark theme, title **Dheerendra Intelligence**.
+
 ### App (`/app/*`)
 
-Wrapped by `src/app/app/layout.tsx` → `AppShell` sidebar. Nav defined in `src/components/app/AppShell.tsx`.
+Wrapped by `src/app/app/layout.tsx` → `AppShell` sidebar (`src/components/app/AppShell.tsx`).
 
 | Route | Purpose |
 |-------|---------|
@@ -162,6 +217,8 @@ Wrapped by `src/app/app/layout.tsx` → `AppShell` sidebar. Nav defined in `src/
 | `/app/scenarios` | BTC shock portfolio stress test |
 | `/app/settings` | Telegram / watchlist / alerts UI (mostly client-only) |
 
+**Nav order:** Dashboard → Analyze → Charts → Backtest → Copilot → Radar → Scenarios → Settings.
+
 ---
 
 ## 5. Core engine — 4 Lanes → 1 Verdict
@@ -172,10 +229,11 @@ Yeh product ka heart hai. Entry: **`GET /api/analyze`**.
 - `src/app/api/analyze/route.ts`
 - `src/lib/analysis/synthesizer.ts`
 - `src/lib/analysis/structure.ts`
+- `src/lib/backtest/lane-weights.ts`
 
 ### End-to-end flow
 
-1. Client call: `/api/analyze?pair=BTC/USDT&timeframe=1h`
+1. Client: `/api/analyze?pair=BTC/USDT&timeframe=1h`
 2. Parallel fetch:
    - Binance klines (200 bars) + spot price
    - Binance Futures flow metrics
@@ -185,7 +243,7 @@ Yeh product ka heart hai. Entry: **`GET /api/analyze`**.
 4. `synthesizeVerdict()` weighted score → direction + tier
 5. Structure / ATR → SL, TP1, TP2
 6. Agar direction `NEUTRAL` nahi → `saveVerdict()` + point-in-time features + cache invalidate
-7. JSON response: `{ lanes, verdict, price, dataSources }`
+7. JSON: `{ lanes, verdict, price, dataSources }`
 
 ### Lane 1 — Technical (`runTechnicalLane`)
 
@@ -220,8 +278,6 @@ Yeh product ka heart hai. Entry: **`GET /api/analyze`**.
 
 ### Synthesis (`synthesizeVerdict`)
 
-Har lane ka score:
-
 ```
 laneScore = BIAS_SCORE[bias] × TIER_SCORE[tier]
 
@@ -241,6 +297,17 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 | `< -0.8` | SHORT | `< -1.5` → HIGH, else MODERATE |
 | otherwise | NEUTRAL | MODERATE |
 
+**Default lane weights** (jab tak ≥30 resolved trades na hoon):
+
+| Lane | Weight |
+|------|--------|
+| Technical | 0.30 |
+| Flow | 0.25 |
+| Narrative | 0.25 |
+| Macro | 0.20 |
+
+Enough history ke baad weights historical lane accuracy se adjust hote hain.
+
 **Levels** (`structure.ts`):
 - ~20-bar swing high/low
 - SL structure-anchored, ATR clamp (~0.8×–2.5× ATR)
@@ -248,9 +315,9 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 - Entry = current price
 - `riskReward` string e.g. `1:2.0`
 
-**Lane weights** (`src/lib/backtest/lane-weights.ts`):
-- Default ≈ equal (0.25 each)
-- Jab enough resolved trades (≥30) ho jaayein → historical lane accuracy se weights adjust
+**Tracked pairs** (`src/lib/market/constants.ts`): BTC, ETH, SOL, BNB, XRP, PAXG (USDT).  
+**Timeframes:** `15m`, `30m`, `1h`, `4h`, `1d`.  
+**Dashboard subset:** BTC, ETH, SOL, PAXG.
 
 ---
 
@@ -259,7 +326,7 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 ### 6.1 Dashboard (`/app/dashboard`)
 
 - Tracked pairs ke live prices (`/api/market`)
-- Analyze / open verdicts overview
+- Multi-pair analyze / open verdicts overview
 - News feed (radar `news` type)
 - Quick market + signal snapshot
 
@@ -274,7 +341,7 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 
 - `LiveCandleChart`: pehle REST `/api/klines`, phir Binance WebSocket live updates
 - Side pe live verdict + price poll
-- Selected pair preference: `localStorage` key `dc_selected_pair` (`tradingview.ts`)
+- Selected pair: `localStorage` key `dc_selected_pair` (`tradingview.ts`)
 
 ### 6.4 Radar (`/app/radar` + landing drawer)
 
@@ -282,27 +349,28 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 
 **API:** `GET /api/radar?type=news|whales|liquidations|etf`
 
-Response includes `{ type, data, source, cached, fetchedAt }`.
+Response: `{ type, data, source, cached, fetchedAt }`.
 
-| Type | Source | Cache TTL (approx) |
-|------|--------|--------------------|
+| Type | Source | Cache TTL |
+|------|--------|-----------|
 | `news` | CoinDesk / CoinTelegraph / Decrypt RSS + keyword sentiment | ~60s |
-| `whales` | Blockchair BTC/ETH + Solana RPC (≥50 BTC / 500 ETH / 5000 SOL) + Binance USD; BTC direction best-effort | ~120s |
+| `whales` | Blockchair BTC/ETH + Solana RPC (size thresholds) | ~120s |
 | `liquidations` | OKX REST + Binance/Bybit WebSocket (BTC/ETH/SOL) | ~30s |
 | `etf` | SoSoValue real net flows (`SOSOVALUE_API_KEY`) → fallback Yahoo proxy | ~300s |
 
-Cache: Upstash Redis (optional) ya in-memory fallback. Optional env: `SOSOVALUE_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
+Cache: Upstash Redis (optional) ya in-memory fallback.
 
-Hook: `src/components/radar/useRadarFeed.ts` — poll, `meta` (source/cached/fetchedAt), manual refresh.
-
+Hook: `src/components/radar/useRadarFeed.ts`.  
 Libs: `src/lib/radar/` — `whales.ts`, `etf-flows.ts`, `liquidations.ts`, `providers/sosovalue.ts`, `utils.ts`, `format.ts`.
 
 ### 6.5 Backtest (`/app/backtest`)
 
 Teen-step pipeline:
 
-1. **Persist** — analyze non-neutral verdicts ko Postgres (ya memory fallback) mein save (`saveVerdict`); saath mein `verdict_features` row for ML training
-2. **Resolve** — cron `GET|POST /api/cron/resolve-verdicts` (~15 min via `vercel.json`)
+1. **Persist** — non-neutral analyze verdicts → Postgres (ya memory) + `verdict_features`
+   - Manual: user visits `/app/analyze`
+   - Auto: cron `GET|POST /api/cron/generate-verdicts` (all tracked pairs × timeframes)
+2. **Resolve** — cron `GET|POST /api/cron/resolve-verdicts`
    - Open verdicts pe klines replay
    - Outcomes: `tp1_hit` / `tp2_hit` / `sl_hit` / `expired`
    - Min age ~5m, max hold ~48h
@@ -311,13 +379,18 @@ Teen-step pipeline:
    - `GET /api/backtest/track-record` → win rate, tier WR, lane accuracy
    - `POST /api/backtest/simulate` → capital, risk%, date range → equity curve + trades
 
-**Libs:** `simulator.ts`, `resolver.ts`, `aggregator.ts`, `cache.ts`, `lane-weights.ts`
+**Cron schedules (dual setup — do not assume Vercel alone is enough):**
+- **Primary (frequent):** cron-job.org → resolve every 15m, generate every 30m
+- **Fallback (Hobby daily only):** `vercel.json` → resolve `0 0 * * *`, generate `0 1 * * *`
+- See README “Cron scheduling” for URL / header details. Both paths are idempotent.
 
-**UI:** `TrackRecordSummary`, `SimulatorPanel`, `EquityCurveChart`
+**Libs:** `simulator.ts`, `resolver.ts`, `aggregator.ts`, `cache.ts`, `lane-weights.ts`  
+**UI:** `TrackRecordSummary`, `SimulatorPanel`, `EquityCurveChart`  
+**Minimum trades:** `MIN_SIM_TRADES` (5)
 
-**Minimum trades:** `MIN_SIM_TRADES` (5) — simulator ko meaningful sample chahiye.
+**Caveat:** Bina `DATABASE_URL` ke verdict store **process memory** hai — restart pe data lose. Postgres set hone par durable.
 
-**Caveat:** Bina `DATABASE_URL` ke verdict store **process memory** hai — restart / cold start pe data lose ho sakta hai. Supabase Postgres set hone par verdicts + features durable rehte hain.
+**ML extract:** `npm run extract-training-data` → resolved verdicts + features → CSV (`scripts/extract-training-data.ts`).
 
 ### 6.6 Scenarios (`/app/scenarios`)
 
@@ -338,7 +411,8 @@ Teen-step pipeline:
 - `POST /api/copilot` `{ message }`
 - Message se symbol extract (BTC/ETH/SOL/BNB/XRP/PAXG, default BTC)
 - Live price + 24h ticker
-- `generateReply()` — **keyword / template replies**, real LLM nahi
+- `generateReply()` — **keyword / template replies**, real LLM nahi  
+  (`ANTHROPIC_API_KEY` reserved / future — aaj use nahi hota)
 
 ### 6.8 Settings (`/app/settings`)
 
@@ -350,9 +424,9 @@ Teen-step pipeline:
 
 - Login/signup: `localStorage.setItem("dc_auth", JSON.stringify({ email }))`
 - Password validate / store nahi hota
-- No middleware, sessions, cookies, DB auth
+- **No** `middleware.ts`, sessions, cookies, DB User model
 - `/app/*` routes **ungated** hain
-- Sign out sirf `/auth/login` pe link
+- Sign out = link to `/auth/login` (AppShell `dc_auth` clear nahi karta)
 
 ---
 
@@ -370,6 +444,21 @@ Teen-step pipeline:
 | GET | `/api/scenarios/correlation` | — | `{ matrix, cached, source }` |
 | GET | `/api/verdicts/open` | — | `{ verdicts, count }` |
 | GET/POST | `/api/cron/resolve-verdicts` | Bearer secret (optional) | Resolve open verdicts |
+| GET/POST | `/api/cron/generate-verdicts` | Bearer secret (optional) | Auto-analyze all tracked pairs × TFs |
+| GET | `/api/health` | — | DB / backtest / env presence snapshot |
+
+### Analyze `dataSources` example
+
+```ts
+{
+  klines: "binance",
+  price: "binance",
+  flow: "binance-futures" | "unavailable",
+  narrative: "alternative.me+coingecko+binance" | "unavailable",
+  macro: "yahoo-finance" | "unavailable",
+  stopLoss: "swing-structure",
+}
+```
 
 ---
 
@@ -388,22 +477,32 @@ Teen-step pipeline:
 
 | Source | Used for |
 |--------|----------|
-| Binance Spot REST (`data-api.binance.vision`, `api.binance.com`) | Price, klines, 24h ticker |
+| Binance Spot REST | Price, klines, 24h ticker |
 | Binance WebSocket | Live chart candles |
-| Binance Futures (`fapi.binance.com`) | OI, funding, long/short |
+| Binance Futures | OI, funding, long/short |
 | CoinGecko | Price fallback; narrative global/trending |
 | alternative.me | Fear & Greed index |
 | Yahoo Finance | Macro (DXY / SPX / Gold); ETF activity proxy |
 | CoinDesk / CoinTelegraph / Decrypt RSS | News headlines |
-| Blockchair | Whale transactions |
-| OKX public API | Liquidations |
+| Blockchair (+ helpers) | Whale transactions |
+| Solana public RPC | SOL whales |
+| OKX / Binance / Bybit | Liquidations |
+| SoSoValue OpenAPI | Real ETF net flows (optional key) |
+| Upstash Redis | Durable radar cache (optional) |
 
-**Optional env** (README / future; core path mostly without LLM):
-- `DATABASE_URL` — Supabase transaction pooler (port 6543) for app runtime
-- `DIRECT_URL` — Supabase session pooler (port 5432) for Prisma migrations
-- `CRON_SECRET`
-- `ANTHROPIC_API_KEY`
-- `TELEGRAM_BOT_TOKEN`
+### Environment variables
+
+| Variable | Role |
+|----------|------|
+| `DATABASE_URL` | App runtime Postgres (Supabase transaction pooler, typically port **6543**) |
+| `DIRECT_URL` | Prisma migrations (session pooler, typically port **5432**) |
+| `CRON_SECRET` | Optional bearer auth for resolve cron |
+| `SOSOVALUE_API_KEY` | Real ETF net flows |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Radar cache |
+| `ANTHROPIC_API_KEY` | Reserved — future LLM copilot (unused today) |
+| `TELEGRAM_BOT_TOKEN` | Reserved — future alerts |
+
+Templates: `.env.example`.
 
 ---
 
@@ -411,28 +510,24 @@ Teen-step pipeline:
 
 | Data | Where | Durable? |
 |------|--------|----------|
-| Verdicts / backtest history | Postgres via Prisma when `DATABASE_URL` set; else in-memory (`src/lib/verdicts/store.ts`) | Yes with DB; no without |
-| Point-in-time lane features | `verdict_features` table (or memory alongside verdict) | Same as verdicts |
-| Radar / track-record caches | In-memory Map + TTL | No |
+| Verdicts / backtest history | Postgres via Prisma when `DATABASE_URL` set; else in-memory | Yes with DB; no without |
+| Point-in-time lane features | `verdict_features` (or memory) | Same as verdicts |
+| Radar / track-record caches | Upstash or in-memory Map + TTL | Redis yes / memory no |
 | Auth stub | `localStorage` `dc_auth` | Browser only |
 | Chart pair | `localStorage` `dc_selected_pair` | Browser |
 | Scenario portfolio | `localStorage` `dc_portfolio_positions` | Browser |
 | Settings alerts | React `useState` | Not persisted |
-| Prisma schema / migrations | `prisma/`, `prisma.config.ts` | Yes (repo) |
-| Postgres tables | Supabase `verdicts`, `verdict_features` | Yes (when `DATABASE_URL` set) |
 
 ### Database schema (Prisma)
 
-Configured in `prisma/schema.prisma`; connection URLs in `prisma.config.ts` (Prisma v7).
-
 | Model / table | Purpose |
 |---------------|---------|
-| `Verdict` → `verdicts` | Trade idea: pair, direction, tier, entry/SL/TP, lane biases, outcome fields |
-| `VerdictFeature` → `verdict_features` | Point-in-time raw lane numerics at verdict creation (ML training); 1:1 with verdict |
+| `Verdict` → `verdicts` | Trade idea: pair, direction, tier, entry/SL/TP, lane biases, outcome |
+| `VerdictFeature` → `verdict_features` | Point-in-time raw lane numerics (ML); 1:1 with verdict |
 
-**Runtime path:** `src/lib/db.ts` → lazy `PrismaClient` + `PrismaPg` adapter on `DATABASE_URL`.  
-**Store:** `src/lib/verdicts/store.ts` — Postgres when configured, else in-memory array.  
-**Feature capture:** `src/lib/verdicts/features.ts` + `buildVerdictFeatures()` in `/api/analyze`.
+**Runtime:** `src/lib/db.ts` → lazy `PrismaClient` + `PrismaPg` on `DATABASE_URL`.  
+**Store:** `src/lib/verdicts/store.ts` — `"postgres"` | `"memory"` via `getVerdictStoreMode()`.  
+**Outcomes:** `tp1_hit` | `tp2_hit` | `sl_hit` | `expired` | `open`.
 
 ---
 
@@ -447,28 +542,41 @@ Shared in `src/lib/types.ts`:
 | `Direction` | `LONG` \| `SHORT` \| `NEUTRAL` |
 | `LaneOutput` | Lane result: badge, bias, tier, reasoning |
 | `Verdict` | Final trade idea: levels, R:R, rationale |
-| `NewsItem` / `WhaleTransaction` / `ETFFlow` / `Liquidation` | Radar payloads |
-| `PortfolioPosition` / `PositionStressResult` / `PortfolioStressResult` | Scenario stress |
+| Radar DTOs | `NewsItem`, `WhaleTransaction`, `ETFFlow`, `Liquidation` |
+| Scenario DTOs | `PortfolioPosition`, `PositionStressResult`, `PortfolioStressResult` |
 
-Persisted shape: `StoredVerdict`, `VerdictFeaturePayload` in `src/lib/verdicts/types.ts` and `features.ts`.
+Persisted: `StoredVerdict`, feature payloads in `src/lib/verdicts/`.
 
 ---
 
-## 12. UI components map
+## 12. UI / design system
 
-### Landing (`src/components/landing/`)
+### Theme (`src/app/globals.css`)
 
-`Hero`, `EarthRadar` (+ `GlobeScene`), `Pipeline`, `Synthesis`, `Delivery`, `CopilotMock`, `RadarDrawer`, `ScenarioSimulator`, `FinalCTA`, `Footer`, `ProgressRail`
+Dark navy palette via CSS variables → Tailwind `@theme`:
 
-### App / feature
+| Token | Role |
+|-------|------|
+| `--bg-primary` `#03060f` | Page background |
+| `--bg-secondary` `#080c1a` | Shell / panels |
+| `--bg-card` `#0d1224` | Cards |
+| `--bull` / `--bear` / `--mixed` / `--accent` | Signal colors |
+| Fonts | Inter (sans), JetBrains Mono (data) |
+
+Utilities: `.glass-card`, glow / pulse helpers.
+
+### Shared components
 
 | Area | Components |
 |------|------------|
-| Shell | `AppShell` |
+| Shell | `AppShell`, `BrandLogo` |
 | Charts | `LiveCandleChart`, `VerdictCard` |
 | Backtest | `TrackRecordSummary`, `SimulatorPanel`, `EquityCurveChart` |
 | Scenarios | `ScenarioStressPanel`, `PositionControls` |
 | Shared UI | `GlassCard`, `BiasPill`, `TierPill`, `CoinIcon`, `ScrollReveal` |
+| Landing | `Hero`, `EarthRadar`/`GlobeScene`, `Pipeline`, `Synthesis`, `Delivery`, `CopilotMock`, `RadarDrawer`, `ScenarioSimulator`, `FinalCTA`, `Footer`, `ProgressRail` |
+
+No shadcn / Redux — domain logic `src/lib/` mein, UI `src/components/` mein.
 
 ---
 
@@ -479,54 +587,63 @@ npm install
 cp .env.example .env          # fill DATABASE_URL + DIRECT_URL (Supabase)
 npm run db:migrate            # apply Prisma migrations (uses DIRECT_URL)
 npm run dev                   # http://localhost:3000
-npm run build
-npm run start
-npm run lint
 ```
 
-**Database commands:**
+| Script | Purpose |
+|--------|---------|
+| `npm run db:generate` | Regenerate Prisma client → `src/generated/prisma` |
+| `npm run db:migrate` | Create / apply migrations |
+| `npm run db:push` | Push schema without migration file |
+| `npm run db:studio` | Browse tables in browser |
+| `npm run extract-training-data` | ML CSV from resolved verdicts |
+| `npm run build` | `prisma generate && next build` |
+| `npm run lint` | ESLint |
 
-| Script | Command | Purpose |
-|--------|---------|---------|
-| `db:generate` | `prisma generate` | Regenerate client → `src/generated/prisma` |
-| `db:migrate` | `prisma migrate dev` | Create / apply migrations |
-| `db:push` | `prisma db push` | Push schema without migration file |
-| `db:studio` | `prisma studio` | Browse tables in browser |
+**Supabase + Prisma v7:**
+- Runtime: `DATABASE_URL` (6543, pgbouncer) in `src/lib/db.ts`
+- CLI: `DIRECT_URL` (5432) via `prisma.config.ts` — sirf 6543 se migrations hang ho sakti hain
 
-**Supabase + Prisma v7 notes:**
-- App runtime connects via `DATABASE_URL` (6543, pgbouncer) in `src/lib/db.ts`
-- Prisma CLI uses `DIRECT_URL` (5432) via `prisma.config.ts` — port 6543 par migrations hang ho sakti hain
-- `getVerdictStoreMode()` returns `"postgres"` or `"memory"` depending on env
+Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart pe lose).
 
-Typical check paths:
-- Landing: `/`
-- App: `/app/dashboard`, `/app/analyze`, `/app/charts`, `/app/radar`, `/app/backtest`, `/app/scenarios`, `/app/copilot`
+**Check paths:** `/` · `/app/dashboard` · `/app/analyze` · `/app/charts` · `/app/radar` · `/app/backtest` · `/app/scenarios` · `/app/copilot`
 
 ---
 
 ## 14. Known limitations
 
-1. **Memory fallback without DB** — `DATABASE_URL` na ho to verdicts ephemeral rehte hain; production backtest ke liye Postgres configure karna chahiye
-2. **Copilot is not an LLM** — keyword templates; model picker cosmetic
-3. **ETF “flows” are a proxy** — volume × price × direction, not issuer flow data
-4. **Auth is mock** — demo UX only; routes not protected
-5. **Branding mix** — package/repo `deepcurrent`, UI “Dheerendra Intelligence”
-6. **Supabase pooler split** — migrations ko `DIRECT_URL` (5432) chahiye; sirf transaction pooler (6543) se CLI hang ho sakti hai
+1. **Auth is mock** — routes unprotected; no User table / sessions  
+2. **Copilot is not an LLM** — keyword templates; model picker cosmetic  
+3. **Memory fallback without DB** — backtest history ephemeral  
+4. **ETF flows** — SoSoValue jab key ho; warna Yahoo **proxy**, issuer flow data nahi  
+5. **Branding mix** — package `deepcurrent`, UI “Dheerendra Intelligence”  
+6. **Supabase dual URL** — runtime 6543 vs migrate 5432  
+7. **Cron** — Vercel pe **daily** resolve; frequent resolve ke liye manual/cron call chahiye  
 
 ---
 
-## 15. Quick “kaunsi functionality kahan”
+## 15. Quick map — “kaunsi functionality kahan”
 
 | User goal | UI | API | Lib |
 |-----------|-----|-----|-----|
 | 4-lane signal | Analyze / Charts / Dashboard | `/api/analyze` | `analysis/synthesizer` |
 | Live candles | Charts | `/api/klines` + Binance WS | `binance`, `tradingview` |
 | Market pulse | Radar | `/api/radar` | `radar/*` |
-| Historical edge | Backtest | `/api/backtest/*` + cron | `backtest/*`, `verdicts/store`, `verdicts/features` |
-| “Agar BTC -10%?” | Scenarios | `/api/scenarios/correlation`, `/api/market` | `scenarios/*` |
+| Historical edge | Backtest | `/api/backtest/*` + cron | `backtest/*`, `verdicts/*` |
+| “Agar BTC −10%?” | Scenarios | `/api/scenarios/correlation`, `/api/market` | `scenarios/*` |
 | Ask a question | Copilot | `/api/copilot` | keyword `generateReply` |
 | Sign in | Auth pages | — | `localStorage` only |
 
 ---
 
-*Last documented from the working tree architecture. Update this file when APIs, storage, or lane logic change.*
+## 16. Docs index
+
+| Doc | Content |
+|-----|---------|
+| [`docs/PROJECT.md`](./PROJECT.md) | Poori architecture + features (yeh file) |
+| [`docs/INSTITUTIONAL-RADAR.md`](./INSTITUTIONAL-RADAR.md) | Radar sources, cache, thresholds |
+| [`README.md`](../README.md) | Quick start |
+| [`.env.example`](../.env.example) | Env var templates |
+
+---
+
+*Last updated from the working tree. Jab APIs, storage, lane logic, ya cron change ho — is file ko sync rakho.*

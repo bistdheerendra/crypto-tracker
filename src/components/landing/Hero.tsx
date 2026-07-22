@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
 export function Hero() {
@@ -28,7 +29,9 @@ export function Hero() {
       </div>
 
       <ScrollReveal className="relative z-10 text-center max-w-4xl">
-        <p className="text-xs tracking-[0.3em] text-accent uppercase mb-6">Dheerendra Intelligence</p>
+        <div className="inline-flex mb-6 px-4 py-2 rounded-full border border-accent/20 bg-accent/5 backdrop-blur-sm">
+          <BrandLogo size="sm" variant="horizontal" showMark />
+        </div>
         <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6">
           The market
           <br />

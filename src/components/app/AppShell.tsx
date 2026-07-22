@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import {
   LayoutDashboard,
   BarChart3,
@@ -85,9 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen min-h-dvh">
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-bg-secondary/95 backdrop-blur-sm border-b border-white/8">
-        <Link href="/" className="font-bold text-sm leading-tight">
-          Dheerendra <span className="text-accent">Intelligence</span>
-        </Link>
+        <BrandLogo href="/" size="sm" variant="stacked" />
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
@@ -108,9 +107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
           <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-bg-secondary border-r border-white/8 flex flex-col shadow-2xl">
             <div className="p-5 border-b border-white/8 flex items-center justify-between">
-              <Link href="/" className="font-bold text-sm leading-tight" onClick={() => setMenuOpen(false)}>
-                Dheerendra <span className="text-accent">Intelligence</span>
-              </Link>
+              <BrandLogo href="/" size="sm" variant="stacked" onClick={() => setMenuOpen(false)} />
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
@@ -127,9 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <aside className="hidden lg:flex w-56 shrink-0 border-r border-white/8 bg-bg-secondary/50 flex-col h-screen sticky top-0">
         <div className="p-5 border-b border-white/8">
-          <Link href="/" className="font-bold text-sm leading-tight">
-            Dheerendra <span className="text-accent">Intelligence</span>
-          </Link>
+          <BrandLogo href="/" size="sm" variant="stacked" />
         </div>
         <NavLinks />
       </aside>

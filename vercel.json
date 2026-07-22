@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/resolve-verdicts",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/generate-verdicts",
+      "schedule": "0 1 * * *"
     }
   ]
 }

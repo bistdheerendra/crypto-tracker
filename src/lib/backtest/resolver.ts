@@ -141,6 +141,23 @@ function checkCandleOutcome(
   return null;
 }
 
+/** Cap concurrent Binance kline fetches to stay under public API rate limits. */
+const KLINE_FETCH_BATCH_SIZE = 12;
+
+async function mapInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(batch.map(fn));
+    results.push(...settled);
+  }
+  return results;
+}
+
 export async function resolveOpenVerdicts(): Promise<ResolveVerdictsSummary> {
   const allOpen = await getOpenVerdicts();
   const totalOpen = allOpen.length;
@@ -159,13 +176,45 @@ export async function resolveOpenVerdicts(): Promise<ResolveVerdictsSummary> {
   let errored = 0;
   const pairCache = new Map<string, Awaited<ReturnType<typeof getKlines>>>();
 
-  for (const v of eligible) {
-    const cacheKey = `${v.pair}:${v.timeframe}`;
-    try {
-      if (!pairCache.has(cacheKey)) {
-        pairCache.set(cacheKey, await getKlines(v.pair, v.timeframe, 200));
+  // Prefetch unique pair:timeframe klines concurrently (batched) instead of
+  // awaiting each fetch sequentially inside the per-verdict loop.
+  const uniqueKeys = [
+    ...new Set(eligible.map((v) => `${v.pair}:${v.timeframe}`)),
+  ];
+  const keyParts = uniqueKeys.map((key) => {
+    const [pair, timeframe] = key.split(":");
+    return { key, pair, timeframe };
+  });
+
+  const fetchResults = await mapInBatches(
+    keyParts,
+    KLINE_FETCH_BATCH_SIZE,
+    async ({ key, pair, timeframe }) => {
+      const klines = await getKlines(pair, timeframe, 200);
+      return { key, klines };
+    }
+  );
+
+  for (const result of fetchResults) {
+    if (result.status === "fulfilled") {
+      pairCache.set(result.value.key, result.value.klines);
+    } else {
+      console.error("[resolve-verdicts] kline prefetch failed", {
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason),
+      });
+    }
+  }
+
+  const resolveResults = await Promise.allSettled(
+    eligible.map(async (v) => {
+      const cacheKey = `${v.pair}:${v.timeframe}`;
+      const klines = pairCache.get(cacheKey);
+      if (!klines) {
+        throw new Error(`No klines available for ${cacheKey}`);
       }
-      const klines = pairCache.get(cacheKey)!;
       const highs = klines.map((k) => parseFloat(String(k[2])));
       const lows = klines.map((k) => parseFloat(String(k[3])));
       const closes = klines.map((k) => parseFloat(String(k[4])));
@@ -174,7 +223,6 @@ export async function resolveOpenVerdicts(): Promise<ResolveVerdictsSummary> {
       const result = checkCandleOutcome(v, highs, lows, closes, timestamps);
       if (result) {
         await resolveVerdict(v.id, result);
-        resolved++;
         console.log("[resolve-verdicts] resolved", {
           verdictId: v.id,
           pair: v.pair,
@@ -184,23 +232,35 @@ export async function resolveOpenVerdicts(): Promise<ResolveVerdictsSummary> {
           outcomeAt: result.outcomeAt,
           rMultiple: result.rMultiple,
         });
-      } else {
-        console.log("[resolve-verdicts] notResolvedYet", {
-          verdictId: v.id,
-          pair: v.pair,
-          timeframe: v.timeframe,
-          createdAt: v.createdAt,
-        });
+        return "resolved" as const;
       }
-    } catch (err) {
+      console.log("[resolve-verdicts] notResolvedYet", {
+        verdictId: v.id,
+        pair: v.pair,
+        timeframe: v.timeframe,
+        createdAt: v.createdAt,
+      });
+      return "open" as const;
+    })
+  );
+
+  for (let i = 0; i < resolveResults.length; i++) {
+    const result = resolveResults[i];
+    const v = eligible[i];
+    if (result.status === "fulfilled") {
+      if (result.value === "resolved") resolved++;
+    } else {
       errored++;
       console.error("[resolve-verdicts] error resolving verdict", {
         verdictId: v.id,
         pair: v.pair,
         timeframe: v.timeframe,
         createdAt: v.createdAt,
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason),
+        stack: result.reason instanceof Error ? result.reason.stack : undefined,
       });
     }
   }

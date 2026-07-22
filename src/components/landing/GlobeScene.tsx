@@ -186,21 +186,27 @@ export function GlobeScene({ dots }: { dots: NewsItem[] }) {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const clock = new THREE.Clock();
     let frame = 0;
+    let disposed = false;
     const animate = () => {
+      if (disposed) return;
       const elapsed = clock.getElapsedTime();
+      // Parent swaps to GlobeStatic for reduced-motion / mobile; this is a belt-and-suspenders.
       if (!reduceMotion) globe.rotation.y += 0.0015;
       globe.rotation.x += (THREE.MathUtils.degToRad(-8) - pointerY * 0.18 - globe.rotation.x) * 0.025;
       globe.rotation.z += (pointerX * 0.08 - globe.rotation.z) * 0.025;
-      markerMeshes.forEach((marker) => {
-        const scale = 1 + Math.sin(elapsed * 2.6 + marker.userData.phase) * 0.22;
-        marker.scale.setScalar(scale);
-      });
+      if (!reduceMotion) {
+        markerMeshes.forEach((marker) => {
+          const scale = 1 + Math.sin(elapsed * 2.6 + marker.userData.phase) * 0.22;
+          marker.scale.setScalar(scale);
+        });
+      }
       renderer.render(scene, camera);
       frame = window.requestAnimationFrame(animate);
     };
     animate();
 
     return () => {
+      disposed = true;
       window.cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       mount.removeEventListener("pointermove", onPointerMove);
