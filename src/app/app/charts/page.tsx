@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LiveCandleChart } from "@/components/charts/LiveCandleChart";
+import { LiveCandleChart, type ChartLevels } from "@/components/charts/LiveCandleChart";
 import { VerdictCard } from "@/components/charts/VerdictCard";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
+import type { Verdict } from "@/lib/types";
 import {
   TIMEFRAME_OPTIONS,
   getStoredPair,
@@ -11,13 +12,30 @@ import {
   type ChartInterval,
 } from "@/lib/tradingview";
 
+function levelsFromVerdict(verdict: Verdict | null): ChartLevels | null {
+  if (!verdict || verdict.direction === "NEUTRAL") return null;
+  return {
+    entry: verdict.entry,
+    stopLoss: verdict.stopLoss,
+    takeProfit1: verdict.takeProfit1,
+    takeProfit2: verdict.takeProfit2,
+  };
+}
+
 export default function ChartsPage() {
   const [pair, setPair] = useState("BTC/USDT");
   const [chartInterval, setChartInterval] = useState<ChartInterval>("60");
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [levels, setLevels] = useState<ChartLevels | null>(null);
 
   useEffect(() => {
     setPair(getStoredPair());
   }, []);
+
+  useEffect(() => {
+    setLivePrice(null);
+    setLevels(null);
+  }, [pair, chartInterval]);
 
   function handlePairChange(next: string) {
     setPair(next);
@@ -29,7 +47,9 @@ export default function ChartsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5">Charts</h1>
-          <p className="text-text-muted text-sm">Live candlestick chart with AI verdict context.</p>
+          <p className="text-text-muted text-sm">
+            Live candles with verdict entry, stop, and take-profit levels.
+          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:ml-auto w-full sm:w-auto">
@@ -66,11 +86,21 @@ export default function ChartsPage() {
 
       <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
         <div className="flex-1 min-h-[500px] lg:min-h-0 rounded-xl border border-white/8 overflow-hidden bg-bg-card">
-          <LiveCandleChart pair={pair} interval={chartInterval} />
+          <LiveCandleChart
+            pair={pair}
+            interval={chartInterval}
+            levels={levels}
+            onPriceUpdate={setLivePrice}
+          />
         </div>
 
         <div className="w-full lg:w-80 shrink-0 lg:overflow-y-auto">
-          <VerdictCard pair={pair} interval={chartInterval} />
+          <VerdictCard
+            pair={pair}
+            interval={chartInterval}
+            livePrice={livePrice}
+            onVerdictChange={(verdict) => setLevels(levelsFromVerdict(verdict))}
+          />
         </div>
       </div>
     </div>

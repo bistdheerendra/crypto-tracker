@@ -5,8 +5,10 @@ import {
   createChart,
   CandlestickSeries,
   ColorType,
+  LineStyle,
   type IChartApi,
   type ISeriesApi,
+  type IPriceLine,
   type CandlestickData,
   type UTCTimestamp,
 } from "lightweight-charts";
@@ -16,9 +18,18 @@ import {
   intervalToApiTimeframe,
 } from "@/lib/tradingview";
 
+export interface ChartLevels {
+  entry: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2: number;
+}
+
 interface LiveCandleChartProps {
   pair: string;
   interval: string;
+  levels?: ChartLevels | null;
+  onPriceUpdate?: (price: number) => void;
 }
 
 interface BinanceKlineMessage {
@@ -32,6 +43,18 @@ interface BinanceKlineMessage {
   };
 }
 
+const LEVEL_LINES: {
+  key: keyof ChartLevels;
+  title: string;
+  color: string;
+  lineStyle: LineStyle;
+}[] = [
+  { key: "entry", title: "Entry", color: "#3ea6ff", lineStyle: LineStyle.Solid },
+  { key: "stopLoss", title: "SL", color: "#ff5c72", lineStyle: LineStyle.Dashed },
+  { key: "takeProfit1", title: "TP1", color: "#2ee6a8", lineStyle: LineStyle.Dotted },
+  { key: "takeProfit2", title: "TP2", color: "#2ee6a8", lineStyle: LineStyle.SparseDotted },
+];
+
 function parseKline(k: NonNullable<BinanceKlineMessage["k"]>): CandlestickData<UTCTimestamp> {
   return {
     time: Math.floor(k.t / 1000) as UTCTimestamp,
@@ -42,13 +65,54 @@ function parseKline(k: NonNullable<BinanceKlineMessage["k"]>): CandlestickData<U
   };
 }
 
-export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
+function applyLevelLines(
+  series: ISeriesApi<"Candlestick">,
+  levels: ChartLevels | null | undefined,
+  existing: IPriceLine[]
+): IPriceLine[] {
+  for (const line of existing) {
+    series.removePriceLine(line);
+  }
+  if (!levels) return [];
+
+  return LEVEL_LINES.map((def) =>
+    series.createPriceLine({
+      price: levels[def.key],
+      color: def.color,
+      lineWidth: 1,
+      lineStyle: def.lineStyle,
+      axisLabelVisible: true,
+      title: def.title,
+    })
+  );
+}
+
+export function LiveCandleChart({
+  pair,
+  interval,
+  levels = null,
+  onPriceUpdate,
+}: LiveCandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const priceLinesRef = useRef<IPriceLine[]>([]);
+  const levelsRef = useRef(levels);
+  const onPriceUpdateRef = useRef(onPriceUpdate);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    onPriceUpdateRef.current = onPriceUpdate;
+  }, [onPriceUpdate]);
+
+  useEffect(() => {
+    levelsRef.current = levels;
+    const series = seriesRef.current;
+    if (!series) return;
+    priceLinesRef.current = applyLevelLines(series, levels, priceLinesRef.current);
+  }, [levels]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -84,6 +148,8 @@ export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
     chartRef.current = chart;
     seriesRef.current = series;
 
+    priceLinesRef.current = applyLevelLines(series, levelsRef.current, priceLinesRef.current);
+
     const observer = new ResizeObserver(() => {
       if (container.clientWidth > 0 && container.clientHeight > 0) {
         chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
@@ -93,6 +159,7 @@ export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
 
     return () => {
       observer.disconnect();
+      priceLinesRef.current = [];
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -133,6 +200,18 @@ export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
 
         seriesRef.current?.setData(candles);
         chartRef.current?.timeScale().fitContent();
+
+        if (seriesRef.current) {
+          priceLinesRef.current = applyLevelLines(
+            seriesRef.current,
+            levelsRef.current,
+            priceLinesRef.current
+          );
+        }
+
+        const last = candles[candles.length - 1];
+        if (last) onPriceUpdateRef.current?.(last.close);
+
         setError(false);
         return true;
       } catch {
@@ -161,7 +240,9 @@ export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
         try {
           const msg = JSON.parse(event.data as string) as BinanceKlineMessage;
           if (!msg.k) return;
-          seriesRef.current.update(parseKline(msg.k));
+          const candle = parseKline(msg.k);
+          seriesRef.current.update(candle);
+          onPriceUpdateRef.current?.(candle.close);
         } catch {
           // ignore malformed ticks
         }
@@ -212,6 +293,13 @@ export function LiveCandleChart({ pair, interval }: LiveCandleChartProps) {
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 text-[10px] text-bull uppercase tracking-wider bg-bg-card/90 px-2.5 py-1 rounded-lg border border-white/8">
           <span className="w-1.5 h-1.5 rounded-full bg-bull pulse-dot" />
           Live
+        </div>
+      )}
+      {levels && !loading && !error && (
+        <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2 text-[10px] font-mono-data bg-bg-card/90 px-2.5 py-1.5 rounded-lg border border-white/8">
+          <span className="text-accent">Entry</span>
+          <span className="text-bear">SL</span>
+          <span className="text-bull">TP1 / TP2</span>
         </div>
       )}
       <div ref={containerRef} className="h-full w-full" />

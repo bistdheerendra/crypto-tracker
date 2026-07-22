@@ -8,17 +8,22 @@ export interface VerdictFeaturePayload {
   rsi14: number | null;
   priceDistanceToEma50Pct: number | null;
   distanceToNearestSwingPct: number | null;
+  rsiMomentum: number | null;
+  volatilityRegime: number | null;
 
   // Flow
   oiChangePct: number | null;
   fundingRate: number | null;
   longShortRatio: number | null;
   price24hChangePct: number | null;
+  fundingRateRoc: number | null;
+  oiRoc: number | null;
 
   // Narrative
   fearGreedIndex: number | null;
   globalMcapChangePct: number | null;
   trendingScore: number | null;
+  fearGreedRoc: number | null;
 
   // Macro
   dxyChangePct: number | null;
@@ -40,6 +45,8 @@ export interface TechnicalRawFeatures {
   rsi14: number;
   priceDistanceToEma50Pct: number;
   distanceToNearestSwingPct: number;
+  rsiMomentum: number | null;
+  volatilityRegime: number | null;
 }
 
 export interface FlowRawFeatures {
@@ -47,12 +54,15 @@ export interface FlowRawFeatures {
   fundingRate: number | null;
   longShortRatio: number | null;
   price24hChangePct: number;
+  fundingRateRoc: number | null;
+  oiRoc: number | null;
 }
 
 export interface NarrativeRawFeatures {
   fearGreedIndex: number | null;
   globalMcapChangePct: number | null;
   trendingScore: number;
+  fearGreedRoc: number | null;
 }
 
 export interface MacroRawFeatures {
@@ -96,15 +106,20 @@ export function buildVerdictFeatures(args: {
     rsi14: args.technical?.rsi14 ?? null,
     priceDistanceToEma50Pct: args.technical?.priceDistanceToEma50Pct ?? null,
     distanceToNearestSwingPct: args.technical?.distanceToNearestSwingPct ?? null,
+    rsiMomentum: args.technical?.rsiMomentum ?? null,
+    volatilityRegime: args.technical?.volatilityRegime ?? null,
 
     oiChangePct: args.flow?.oiChangePct ?? null,
     fundingRate: args.flow?.fundingRate ?? null,
     longShortRatio: args.flow?.longShortRatio ?? null,
     price24hChangePct: args.flow?.price24hChangePct ?? null,
+    fundingRateRoc: args.flow?.fundingRateRoc ?? null,
+    oiRoc: args.flow?.oiRoc ?? null,
 
     fearGreedIndex: args.narrative?.fearGreedIndex ?? null,
     globalMcapChangePct: args.narrative?.globalMcapChangePct ?? null,
     trendingScore: args.narrative?.trendingScore ?? null,
+    fearGreedRoc: args.narrative?.fearGreedRoc ?? null,
 
     dxyChangePct: args.macro?.dxyChangePct ?? null,
     spxChangePct: args.macro?.spxChangePct ?? null,

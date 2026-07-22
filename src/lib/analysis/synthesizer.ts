@@ -1,5 +1,5 @@
 import type { Bias, Direction, LaneOutput, Tier, Verdict } from "../types";
-import { computeATR } from "../binance";
+import { computeATR, computeVolatilityRegime } from "../binance";
 import { getDynamicLaneWeights } from "../backtest/lane-weights";
 import type { FlowMetrics } from "../binance-futures";
 import type { MacroSnapshot } from "../macro";
@@ -12,6 +12,9 @@ import type {
   TechnicalRawFeatures,
 } from "../verdicts/features";
 import { computeStructureLevels, computeSwingLevels } from "./structure";
+
+/** Candles back for RSI momentum (RSI now − RSI N ago); fits within 200-kline fetch. */
+const RSI_MOMENTUM_LOOKBACK = 5;
 
 const BIAS_SCORE: Record<Bias, number> = {
   BULL: 1,
@@ -120,6 +123,18 @@ export function runTechnicalLane(
   const ema50 = closes.length >= 50 ? ema(closes, 50) : closes[closes.length - 1];
   const ema200 = closes.length >= 200 ? ema(closes, 200) : ema50;
   const rsi = computeRSI(closes);
+  const rsiMomentum = computeRsiMomentum(closes, RSI_MOMENTUM_LOOKBACK);
+  const volatilityRegime = computeVolatilityRegime(highs, lows, closes);
+  if (rsiMomentum == null) {
+    console.warn(
+      `[technical] rsiMomentum unavailable: need ≥${14 + RSI_MOMENTUM_LOOKBACK + 1} closes`
+    );
+  }
+  if (volatilityRegime == null) {
+    console.warn(
+      "[technical] volatilityRegime unavailable: insufficient candles for ATR series"
+    );
+  }
   const price = closes[closes.length - 1];
   const bullish = price > ema50 && ema50 > ema200;
   const bearish = price < ema50 && ema50 < ema200;
@@ -133,6 +148,8 @@ export function runTechnicalLane(
     rsi14: rsi,
     priceDistanceToEma50Pct: ema50 !== 0 ? ((price - ema50) / ema50) * 100 : 0,
     distanceToNearestSwingPct: Math.min(distSwingHighPct, distSwingLowPct),
+    rsiMomentum,
+    volatilityRegime,
   };
 
   return {
@@ -151,12 +168,17 @@ export function runTechnicalLane(
   };
 }
 
-export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneRunResult {
+export function runFlowLane(
+  flow: FlowMetrics & { sources?: string[] },
+  priceChange24hPct: number
+): LaneRunResult {
   const raw: FlowRawFeatures = {
     oiChangePct: flow.available ? flow.oiChange24hPct : null,
     fundingRate: flow.available ? flow.fundingRate : null,
     longShortRatio: flow.available ? flow.longShortRatio : null,
     price24hChangePct: priceChange24hPct,
+    fundingRateRoc: flow.available ? flow.fundingRateRoc : null,
+    oiRoc: flow.available ? flow.oiRoc : null,
   };
 
   if (!flow.available) {
@@ -189,6 +211,11 @@ export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneR
       ? "HIGH"
       : "MODERATE";
 
+  const venueSuffix =
+    flow.sources && flow.sources.length > 1
+      ? ` · ${flow.sources.join("+")}`
+      : "";
+
   return {
     output: {
       lane: "Flow",
@@ -196,7 +223,7 @@ export function runFlowLane(flow: FlowMetrics, priceChange24hPct: number): LaneR
       bias,
       tier,
       reasoning: [
-        `OI ${flow.oiChange24hPct >= 0 ? "+" : ""}${flow.oiChange24hPct.toFixed(1)}% (24h)`,
+        `OI ${flow.oiChange24hPct >= 0 ? "+" : ""}${flow.oiChange24hPct.toFixed(1)}% (24h)${venueSuffix}`,
         `Funding ${flow.fundingRate.toFixed(4)}%`,
         `Long/short ratio ${flow.longShortRatio.toFixed(2)}`,
       ],
@@ -221,6 +248,7 @@ export function runNarrativeLane(
     fearGreedIndex: narrative.fearGreed,
     globalMcapChangePct: narrative.globalMarketCapChange24hPct,
     trendingScore,
+    fearGreedRoc: narrative.fearGreedRoc,
   };
 
   if (!narrative.available) {
@@ -250,6 +278,11 @@ export function runNarrativeLane(
   if (narrative.priceChange24hPct > 2) bullPoints += 1;
   else if (narrative.priceChange24hPct < -2) bearPoints += 1;
 
+  if (narrative.headlineSentimentScore != null) {
+    if (narrative.headlineSentimentScore >= 0.15) bullPoints += 1;
+    else if (narrative.headlineSentimentScore <= -0.15) bearPoints += 1;
+  }
+
   let bias: Bias = "MIXED";
   if (bullPoints > bearPoints) bias = "BULL";
   else if (bearPoints > bullPoints) bias = "BEAR";
@@ -257,12 +290,20 @@ export function runNarrativeLane(
   const tier: Tier =
     narrative.fearGreed != null && (narrative.fearGreed >= 75 || narrative.fearGreed <= 25)
       ? "HIGH"
-      : "MODERATE";
+      : Math.abs(narrative.headlineSentimentScore ?? 0) >= 0.35
+        ? "HIGH"
+        : "MODERATE";
 
   const reasoning: string[] = [];
   if (narrative.fearGreed != null) {
     reasoning.push(
       `Fear & Greed ${narrative.fearGreed} (${narrative.fearGreedLabel ?? "index"})`
+    );
+  }
+  if (narrative.headlineSentiment != null && narrative.headlineSampleSize > 0) {
+    const s = narrative.headlineSentimentScore ?? 0;
+    reasoning.push(
+      `Headlines ${narrative.headlineSentiment} (${s >= 0 ? "+" : ""}${s.toFixed(2)}, n=${narrative.headlineSampleSize})`
     );
   }
   if (narrative.globalMarketCapChange24hPct != null) {
@@ -373,6 +414,19 @@ function computeRSI(prices: number[], period = 14): number {
   const avgLoss = losses / period;
   if (avgLoss === 0) return 100;
   return 100 - 100 / (1 + avgGain / avgLoss);
+}
+
+/** RSI(14) now minus RSI(14) from `lookback` candles ago. */
+function computeRsiMomentum(
+  closes: number[],
+  lookback: number,
+  period = 14
+): number | null {
+  const minLen = period + lookback + 1;
+  if (closes.length < minLen) return null;
+  const rsiNow = computeRSI(closes, period);
+  const rsiPrior = computeRSI(closes.slice(0, closes.length - lookback), period);
+  return rsiNow - rsiPrior;
 }
 
 export { computeATR };

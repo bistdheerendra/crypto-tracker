@@ -55,13 +55,18 @@ function rowToStored(row: {
     rsi14: number | null;
     priceDistanceToEma50Pct: number | null;
     distanceToNearestSwingPct: number | null;
+    rsiMomentum: number | null;
+    volatilityRegime: number | null;
     oiChangePct: number | null;
     fundingRate: number | null;
     longShortRatio: number | null;
     price24hChangePct: number | null;
+    fundingRateRoc: number | null;
+    oiRoc: number | null;
     fearGreedIndex: number | null;
     globalMcapChangePct: number | null;
     trendingScore: number | null;
+    fearGreedRoc: number | null;
     dxyChangePct: number | null;
     spxChangePct: number | null;
     goldChangePct: number | null;
@@ -80,13 +85,18 @@ function rowToStored(row: {
         rsi14: row.features.rsi14,
         priceDistanceToEma50Pct: row.features.priceDistanceToEma50Pct,
         distanceToNearestSwingPct: row.features.distanceToNearestSwingPct,
+        rsiMomentum: row.features.rsiMomentum,
+        volatilityRegime: row.features.volatilityRegime,
         oiChangePct: row.features.oiChangePct,
         fundingRate: row.features.fundingRate,
         longShortRatio: row.features.longShortRatio,
         price24hChangePct: row.features.price24hChangePct,
+        fundingRateRoc: row.features.fundingRateRoc,
+        oiRoc: row.features.oiRoc,
         fearGreedIndex: row.features.fearGreedIndex,
         globalMcapChangePct: row.features.globalMcapChangePct,
         trendingScore: row.features.trendingScore,
+        fearGreedRoc: row.features.fearGreedRoc,
         dxyChangePct: row.features.dxyChangePct,
         spxChangePct: row.features.spxChangePct,
         goldChangePct: row.features.goldChangePct,
@@ -220,13 +230,18 @@ export async function saveVerdict(
               rsi14: features.rsi14,
               priceDistanceToEma50Pct: features.priceDistanceToEma50Pct,
               distanceToNearestSwingPct: features.distanceToNearestSwingPct,
+              rsiMomentum: features.rsiMomentum,
+              volatilityRegime: features.volatilityRegime,
               oiChangePct: features.oiChangePct,
               fundingRate: features.fundingRate,
               longShortRatio: features.longShortRatio,
               price24hChangePct: features.price24hChangePct,
+              fundingRateRoc: features.fundingRateRoc,
+              oiRoc: features.oiRoc,
               fearGreedIndex: features.fearGreedIndex,
               globalMcapChangePct: features.globalMcapChangePct,
               trendingScore: features.trendingScore,
+              fearGreedRoc: features.fearGreedRoc,
               dxyChangePct: features.dxyChangePct,
               spxChangePct: features.spxChangePct,
               goldChangePct: features.goldChangePct,

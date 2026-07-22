@@ -1,0 +1,98 @@
+name: Frequent DeepCurrent crons
+
+# Vercel Hobby cron is daily-only. This workflow densifies track-record + alerts.
+# Secrets: CRON_BASE_URL (https://your-app.vercel.app), CRON_SECRET
+
+on:
+  schedule:
+    # Every 15 minutes — resolve open verdicts
+    - cron: "*/15 * * * *"
+    # Every 30 minutes — generate new verdicts (also covered by */15 odd slots via if)
+    - cron: "5,35 * * * *"
+    # Every 15 minutes offset — radar / telegram alerts
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which cron to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - resolve
+          - generate
+          - alerts
+
+concurrency:
+  group: deepcurrent-cron
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require secrets
+        env:
+          CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_BASE_URL" ]; then
+            echo "Missing secret CRON_BASE_URL — set to https://your-app.vercel.app"
+            exit 1
+          fi
+
+      - name: Resolve verdicts (15m)
+        if: >
+          github.event_name == 'schedule' && github.event.schedule == '*/15 * * * *'
+          || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'resolve'))
+        env:
+          CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${CRON_BASE_URL%/}/api/cron/resolve-verdicts"
+          echo "POST $URL"
+          if [ -n "${CRON_SECRET:-}" ]; then
+            curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" "$URL"
+          else
+            curl -fsS -X POST "$URL"
+          fi
+          echo
+
+      - name: Generate verdicts (30m)
+        if: >
+          github.event_name == 'schedule' && github.event.schedule == '5,35 * * * *'
+          || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'generate'))
+        env:
+          CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${CRON_BASE_URL%/}/api/cron/generate-verdicts"
+          echo "POST $URL"
+          if [ -n "${CRON_SECRET:-}" ]; then
+            curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" "$URL"
+          else
+            curl -fsS -X POST "$URL"
+          fi
+          echo
+
+      - name: Check alerts (radar spikes)
+        if: >
+          github.event_name == 'schedule' && github.event.schedule == '7,22,37,52 * * * *'
+          || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'alerts'))
+        env:
+          CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          URL="${CRON_BASE_URL%/}/api/cron/check-alerts"
+          echo "POST $URL"
+          if [ -n "${CRON_SECRET:-}" ]; then
+            curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" "$URL"
+          else
+            curl -fsS -X POST "$URL"
+          fi
+          echo

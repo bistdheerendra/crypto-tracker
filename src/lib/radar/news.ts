@@ -1,4 +1,5 @@
 import type { NewsItem, Sentiment } from "@/lib/types";
+import { aggregateHeadlineScores, scoreHeadlineSentiment } from "@/lib/nlp/headline-sentiment";
 import { formatTimeAgo } from "./utils";
 
 const RSS_FEEDS = [
@@ -28,37 +29,6 @@ const RSS_FEEDS = [
   },
 ] as const;
 
-const BULLISH = [
-  "surge",
-  "rally",
-  "record",
-  "approval",
-  "inflow",
-  "bullish",
-  "gains",
-  "soar",
-  "rise",
-  "jump",
-  "high",
-  "breakout",
-  "adoption",
-];
-const BEARISH = [
-  "crash",
-  "drop",
-  "ban",
-  "hack",
-  "outflow",
-  "bearish",
-  "plunge",
-  "fall",
-  "selloff",
-  "fraud",
-  "lawsuit",
-  "decline",
-  "loss",
-];
-
 function decodeHtml(text: string): string {
   return text
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -87,17 +57,6 @@ function parseRssItems(xml: string): { title: string; pubDate: string; link: str
   return items;
 }
 
-function inferSentiment(headline: string): Sentiment {
-  const lower = headline.toLowerCase();
-  let bull = 0;
-  let bear = 0;
-  for (const word of BULLISH) if (lower.includes(word)) bull += 1;
-  for (const word of BEARISH) if (lower.includes(word)) bear += 1;
-  if (bull > bear) return "bullish";
-  if (bear > bull) return "bearish";
-  return "neutral";
-}
-
 function inferMarketTag(headline: string): string {
   const lower = headline.toLowerCase();
   if (lower.includes("bitcoin") || lower.includes("btc")) return "BTC";
@@ -124,7 +83,7 @@ export async function fetchLiveNews(limit = 12): Promise<NewsItem[]> {
       const xml = await fetchFeedXml(feed.url);
       return parseRssItems(xml).slice(0, 6).map((item, index) => {
         const published = item.pubDate ? new Date(item.pubDate) : new Date();
-        const sentiment = inferSentiment(item.title);
+        const { sentiment, confidence } = scoreHeadlineSentiment(item.title);
         return {
           id: `${feed.source}-${index}-${item.link.slice(-12)}`,
           location: feed.location,
@@ -134,7 +93,7 @@ export async function fetchLiveNews(limit = 12): Promise<NewsItem[]> {
           source: feed.source,
           sentiment,
           marketTag: inferMarketTag(item.title),
-          connected: sentiment === "neutral" ? 1 : 2,
+          connected: sentiment === "neutral" ? 1 : Math.max(2, Math.round(1 + confidence * 2)),
           lat: feed.lat,
           lng: feed.lng,
           _publishedAt: published.getTime(),
@@ -152,4 +111,24 @@ export async function fetchLiveNews(limit = 12): Promise<NewsItem[]> {
     .map(({ _publishedAt, ...item }) => item as NewsItem);
 
   return merged;
+}
+
+/** Pair-aware headline sentiment for Narrative lane (−1…1). */
+export async function getNewsSentimentForPair(
+  pair: string,
+  limit = 16
+): Promise<{ score: number; sentiment: Sentiment; sampleSize: number }> {
+  const base = pair.split("/")[0]?.toUpperCase() ?? "";
+  const news = await fetchLiveNews(limit);
+  const relevant = news.filter((n) => {
+    const tag = n.marketTag.toUpperCase();
+    const h = n.headline.toUpperCase();
+    if (tag === base) return true;
+    if (base && h.includes(base)) return true;
+    if (base === "BTC" && (tag === "ETF" || h.includes("BITCOIN"))) return true;
+    if (base === "ETH" && h.includes("ETHEREUM")) return true;
+    return tag === "CRYPTO" || tag === "REGULATION";
+  });
+  const headlines = (relevant.length ? relevant : news).map((n) => n.headline);
+  return aggregateHeadlineScores(headlines);
 }

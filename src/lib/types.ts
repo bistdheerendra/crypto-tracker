@@ -39,6 +39,20 @@ export interface NewsItem {
   lng: number;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  category: string;
+  /** ISO UTC timestamp of the event */
+  eventAt: string;
+  /** Date in Asia/Kolkata, e.g. "22 Jul 2026" */
+  dateIst: string;
+  /** Time in Asia/Kolkata, e.g. "05:30 PM IST" */
+  timeIst: string;
+  url?: string;
+  source: string;
+}
+
 export interface WhaleTransaction {
   id: string;
   address: string;

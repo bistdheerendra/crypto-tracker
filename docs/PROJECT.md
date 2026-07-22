@@ -37,7 +37,7 @@ DeepCurrent ek hi pipeline mein sab jodta hai:
 | **Radar** | Institutional pulse — whales, ETF flows, liquidations, news |
 | **Backtest** | Verdicts save → resolve → win rate / equity simulator |
 | **Scenarios** | “Agar BTC −10%?” portfolio stress test |
-| **Copilot** | Chat UI + live price context (rule-based replies) |
+| **Copilot** | Chat UI + live price + LLM (Anthropic) with template fallback |
 
 ### Stack
 
@@ -258,9 +258,9 @@ Yeh product ka heart hai. Entry: **`GET /api/analyze`**.
 
 | Item | Detail |
 |------|--------|
-| Data | Futures OI Δ%, funding rate, long/short ratio (+ 24h price change) |
-| Source | `src/lib/binance-futures.ts` → `getFlowMetrics` |
-| Note | Futures unavailable hone par lane gracefully degrade karti hai |
+| Data | Futures OI Δ%, funding rate, long/short ratio (+ 24h price change) across **Binance + Bybit + OKX** |
+| Source | `src/lib/flow/aggregate.ts` → `getFlowMetrics` |
+| Note | % metrics averaged; absolute OI prefers Binance; missing venues degrade gracefully |
 
 ### Lane 3 — Narrative (`runNarrativeLane`)
 
@@ -407,18 +407,19 @@ Teen-step pipeline:
 
 ### 6.7 Copilot (`/app/copilot`)
 
-- UI model dropdown **cosmetic** (server ignore karta hai)
-- `POST /api/copilot` `{ message }`
+- Model dropdown maps to Anthropic Claude (Sonnet)
+- `POST /api/copilot` `{ message, model? }`
 - Message se symbol extract (BTC/ETH/SOL/BNB/XRP/PAXG, default BTC)
-- Live price + 24h ticker
-- `generateReply()` — **keyword / template replies**, real LLM nahi  
-  (`ANTHROPIC_API_KEY` reserved / future — aaj use nahi hota)
+- Live price + 24h ticker + open verdicts + news headlines as context
+- `GEMINI_API_KEY` (free, preferred) ya `ANTHROPIC_API_KEY` → real LLM; warna **template fallback**
+- Default model: Gemini 2.5 Flash; Claude optional when Anthropic key set
 
 ### 6.8 Settings (`/app/settings`)
 
-- Telegram link / watchlist / alerts UI
-- Mostly React state; Telegram link cosmetic
-- Durable backend persist nahi
+- Telegram chat id + test alert
+- Alert prefs: enabled, minTier, watchlist, radar spike toggles
+- Persisted via `/api/settings` (Upstash Redis or in-memory)
+- Env fallbacks: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
 
 ### 6.9 Auth — mock
 
@@ -445,6 +446,9 @@ Teen-step pipeline:
 | GET | `/api/verdicts/open` | — | `{ verdicts, count }` |
 | GET/POST | `/api/cron/resolve-verdicts` | Bearer secret (optional) | Resolve open verdicts |
 | GET/POST | `/api/cron/generate-verdicts` | Bearer secret (optional) | Auto-analyze all tracked pairs × TFs |
+| GET/POST | `/api/cron/check-alerts` | Bearer secret (optional) | Radar spike → Telegram |
+| GET/PUT | `/api/settings` | prefs JSON | Alert preferences |
+| POST | `/api/settings/test-telegram` | — | Send test Telegram message |
 | GET | `/api/health` | — | DB / backtest / env presence snapshot |
 
 ### Analyze `dataSources` example
@@ -453,7 +457,7 @@ Teen-step pipeline:
 {
   klines: "binance",
   price: "binance",
-  flow: "binance-futures" | "unavailable",
+  flow: "binance+bybit+okx" | "binance" | "unavailable",
   narrative: "alternative.me+coingecko+binance" | "unavailable",
   macro: "yahoo-finance" | "unavailable",
   stopLoss: "swing-structure",
@@ -479,7 +483,8 @@ Teen-step pipeline:
 |--------|----------|
 | Binance Spot REST | Price, klines, 24h ticker |
 | Binance WebSocket | Live chart candles |
-| Binance Futures | OI, funding, long/short |
+| Binance Futures | OI, funding, long/short (primary flow venue) |
+| Bybit / OKX | Additional OI + funding (+ L/S) averaged into Flow lane |
 | CoinGecko | Price fallback; narrative global/trending |
 | alternative.me | Fear & Greed index |
 | Yahoo Finance | Macro (DXY / SPX / Gold); ETF activity proxy |
@@ -499,8 +504,10 @@ Teen-step pipeline:
 | `CRON_SECRET` | Optional bearer auth for resolve cron |
 | `SOSOVALUE_API_KEY` | Real ETF net flows |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Radar cache |
-| `ANTHROPIC_API_KEY` | Reserved — future LLM copilot (unused today) |
-| `TELEGRAM_BOT_TOKEN` | Reserved — future alerts |
+| `GEMINI_API_KEY` | Free Copilot LLM via Google AI Studio (preferred) |
+| `ANTHROPIC_API_KEY` | Paid Copilot LLM fallback (Claude) |
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot API token for alerts |
+| `TELEGRAM_CHAT_ID` | Default chat id (Settings can override) |
 
 Templates: `.env.example`.
 
@@ -516,7 +523,7 @@ Templates: `.env.example`.
 | Auth stub | `localStorage` `dc_auth` | Browser only |
 | Chart pair | `localStorage` `dc_selected_pair` | Browser |
 | Scenario portfolio | `localStorage` `dc_portfolio_positions` | Browser |
-| Settings alerts | React `useState` | Not persisted |
+| Alert prefs | Upstash / in-memory (`alerts:prefs`) | Redis yes / memory no |
 
 ### Database schema (Prisma)
 
@@ -611,13 +618,14 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 
 ## 14. Known limitations
 
-1. **Auth is mock** — routes unprotected; no User table / sessions  
-2. **Copilot is not an LLM** — keyword templates; model picker cosmetic  
-3. **Memory fallback without DB** — backtest history ephemeral  
+1. **Auth is mock** — routes unprotected; no User table / sessions (intentional for solo use)
+2. **Copilot needs `GEMINI_API_KEY` (free) or `ANTHROPIC_API_KEY`** — without either, keyword templates still work
+3. **Memory fallback without DB / Redis** — backtest history + alert prefs ephemeral on restart
 4. **ETF flows** — SoSoValue jab key ho; warna Yahoo **proxy**, issuer flow data nahi  
 5. **Branding mix** — package `deepcurrent`, UI “Dheerendra Intelligence”  
 6. **Supabase dual URL** — runtime 6543 vs migrate 5432  
-7. **Cron** — Vercel pe **daily** resolve; frequent resolve ke liye manual/cron call chahiye  
+7. **Cron** — Vercel pe **daily** fallback; dense schedule via GitHub Actions / cron-job.org (`docs/CRON.md`)  
+8. **Telegram** — needs bot token + chat id; no BotFather deep-link OAuth flow
 
 ---
 
@@ -630,7 +638,8 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 | Market pulse | Radar | `/api/radar` | `radar/*` |
 | Historical edge | Backtest | `/api/backtest/*` + cron | `backtest/*`, `verdicts/*` |
 | “Agar BTC −10%?” | Scenarios | `/api/scenarios/correlation`, `/api/market` | `scenarios/*` |
-| Ask a question | Copilot | `/api/copilot` | keyword `generateReply` |
+| Ask a question | Copilot | `/api/copilot` | Anthropic LLM + template fallback |
+| Alerts | Settings | `/api/settings`, `/api/cron/check-alerts` | `alerts/*` + Telegram |
 | Sign in | Auth pages | — | `localStorage` only |
 
 ---
@@ -641,6 +650,7 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 |-----|---------|
 | [`docs/PROJECT.md`](./PROJECT.md) | Poori architecture + features (yeh file) |
 | [`docs/INSTITUTIONAL-RADAR.md`](./INSTITUTIONAL-RADAR.md) | Radar sources, cache, thresholds |
+| [`docs/CRON.md`](./CRON.md) | Frequent cron (GitHub Actions / cron-job.org) |
 | [`README.md`](../README.md) | Quick start |
 | [`.env.example`](../.env.example) | Env var templates |
 

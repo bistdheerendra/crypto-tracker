@@ -107,14 +107,53 @@ export function computeATR(
   closes: number[],
   period = 14
 ): number {
+  const trs = trueRanges(highs, lows, closes);
+  if (trs.length < period) return 0;
+  return trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+}
+
+/**
+ * Current ATR / mean of the last `avgLookback` ATR values.
+ * 1.0 ≈ normal; >1.5 elevated; <0.7 compressed.
+ */
+export function computeVolatilityRegime(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period = 14,
+  avgLookback = 14
+): number | null {
+  const trs = trueRanges(highs, lows, closes);
+  if (trs.length < period + avgLookback - 1) return null;
+
+  const atrSeries: number[] = [];
+  for (let end = period; end <= trs.length; end++) {
+    const window = trs.slice(end - period, end);
+    atrSeries.push(window.reduce((a, b) => a + b, 0) / period);
+  }
+
+  const recent = atrSeries.slice(-avgLookback);
+  if (recent.length < avgLookback) return null;
+  const current = recent[recent.length - 1]!;
+  const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+  if (!(avg > 0)) return null;
+  return current / avg;
+}
+
+function trueRanges(
+  highs: number[],
+  lows: number[],
+  closes: number[]
+): number[] {
   const trs: number[] = [];
   for (let i = 1; i < closes.length; i++) {
-    const tr = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
+    trs.push(
+      Math.max(
+        highs[i]! - lows[i]!,
+        Math.abs(highs[i]! - closes[i - 1]!),
+        Math.abs(lows[i]! - closes[i - 1]!)
+      )
     );
-    trs.push(tr);
   }
-  return trs.slice(-period).reduce((a, b) => a + b, 0) / period;
+  return trs;
 }

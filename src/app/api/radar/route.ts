@@ -3,6 +3,7 @@ import { fetchLiveNews } from "@/lib/radar/news";
 import { fetchWhaleTransactions } from "@/lib/radar/whales";
 import { fetchLiquidations } from "@/lib/radar/liquidations";
 import { fetchEtfFlows } from "@/lib/radar/etf-flows";
+import { fetchUpcomingEvents } from "@/lib/radar/events";
 import { getRadarCache, setRadarCache } from "@/lib/radar/utils";
 
 const TTL_MS: Record<string, number> = {
@@ -10,6 +11,7 @@ const TTL_MS: Record<string, number> = {
   whales: 120_000,
   liquidations: 30_000,
   etf: 300_000,
+  events: 300_000,
 };
 
 interface CachedRadarPayload {
@@ -54,6 +56,10 @@ export async function GET(req: NextRequest) {
         source = etfResult.source;
         break;
       }
+      case "events":
+        data = await fetchUpcomingEvents();
+        source = "binance-cms+coinpaprika";
+        break;
       default:
         return NextResponse.json({ error: "Unknown radar type" }, { status: 400 });
     }

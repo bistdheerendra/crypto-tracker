@@ -51,17 +51,22 @@ model VerdictFeature {
   rsi14                     Float?
   priceDistanceToEma50Pct   Float?
   distanceToNearestSwingPct Float?
+  rsiMomentum               Float? // RSI(14) now − RSI(14) N candles ago
+  volatilityRegime          Float? // current ATR / avg ATR (1.0 = normal)
 
   // Flow
   oiChangePct               Float?
   fundingRate               Float?
   longShortRatio            Float?
   price24hChangePct         Float?
+  fundingRateRoc            Float? // funding rate delta vs ~8h prior
+  oiRoc                     Float? // acceleration of OI % change (recent − prior window)
 
   // Narrative
   fearGreedIndex            Float?
   globalMcapChangePct       Float?
   trendingScore             Float?
+  fearGreedRoc              Float? // F&G now − F&G ~24h ago
 
   // Macro
   dxyChangePct              Float?

@@ -100,6 +100,12 @@ export async function GET() {
       SOSOVALUE_API_KEY: !!process.env.SOSOVALUE_API_KEY,
       UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
       CRON_SECRET: !!process.env.CRON_SECRET,
+      ANTHROPIC_API_KEY: !!process.env.ANTHROPIC_API_KEY,
+      GEMINI_API_KEY: !!(
+        process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      ),
+      TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
+      TELEGRAM_CHAT_ID: !!process.env.TELEGRAM_CHAT_ID,
     },
   });
 }

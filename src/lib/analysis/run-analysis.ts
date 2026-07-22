@@ -1,5 +1,4 @@
-import { getKlines, getPrice, computeATR } from "@/lib/binance";
-import { getFlowMetrics } from "@/lib/binance-futures";
+import { getFlowMetrics, formatFlowSources } from "@/lib/flow/aggregate";
 import { getMacroSnapshot } from "@/lib/macro";
 import { getNarrativeSnapshot } from "@/lib/narrative";
 import {
@@ -20,6 +19,7 @@ import {
 } from "@/lib/verdicts/features";
 import { saveVerdict } from "@/lib/verdicts/store";
 import type { LaneOutput, Verdict } from "@/lib/types";
+import { getKlines, getPrice, computeATR } from "@/lib/binance";
 
 export type AnalysisResult = {
   lanes: LaneOutput[];
@@ -101,6 +101,15 @@ export async function runAnalysis(
     await invalidateCache("track-record");
     invalidateLaneWeightCache();
     persisted = true;
+    // Telegram alert — never block analyze on notify failures
+    void import("@/lib/alerts/notify")
+      .then(({ notifyVerdictAlert }) => notifyVerdictAlert(verdict, lanes))
+      .catch((err) => {
+        console.warn(
+          "[alerts] verdict notify failed",
+          err instanceof Error ? err.message : String(err)
+        );
+      });
   }
 
   return {
@@ -110,7 +119,7 @@ export async function runAnalysis(
     dataSources: {
       klines: "binance",
       price: "binance",
-      flow: flow.available ? "binance-futures" : "unavailable",
+      flow: flow.available ? formatFlowSources(flow.sources) : "unavailable",
       narrative: narrative.available
         ? "alternative.me+coingecko+binance"
         : "unavailable",

@@ -9,56 +9,67 @@ import type { Verdict } from "@/lib/types";
 interface VerdictCardProps {
   pair: string;
   interval: string;
+  /** Live price from chart WebSocket (preferred over REST poll). */
+  livePrice?: number | null;
+  onVerdictChange?: (verdict: Verdict | null) => void;
 }
 
-const PRICE_POLL_MS = 10_000;
-
-export function VerdictCard({ pair, interval }: VerdictCardProps) {
+export function VerdictCard({
+  pair,
+  interval,
+  livePrice = null,
+  onVerdictChange,
+}: VerdictCardProps) {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
-  const [price, setPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [priceFlash, setPriceFlash] = useState<"up" | "down" | null>(null);
   const prevPriceRef = useRef<number | null>(null);
+  const onVerdictChangeRef = useRef(onVerdictChange);
 
   useEffect(() => {
-    setLoading(true);
-    const timeframe = intervalToApiTimeframe(interval);
-    fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
-      .then((r) => r.json())
-      .then((d) => setVerdict(d.verdict))
-      .catch(() => setVerdict(null))
-      .finally(() => setLoading(false));
-  }, [pair, interval]);
+    onVerdictChangeRef.current = onVerdictChange;
+  }, [onVerdictChange]);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    const timeframe = intervalToApiTimeframe(interval);
 
-    async function fetchPrice() {
-      try {
-        const res = await fetch(`/api/market?symbol=${encodeURIComponent(pair)}`);
-        const data = await res.json();
-        if (!active || typeof data.price !== "number") return;
+    fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!active) return;
+        const next = (d.verdict as Verdict | undefined) ?? null;
+        setVerdict(next);
+        onVerdictChangeRef.current?.(next);
+      })
+      .catch(() => {
+        if (!active) return;
+        setVerdict(null);
+        onVerdictChangeRef.current?.(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-        const prev = prevPriceRef.current;
-        if (prev !== null && data.price !== prev) {
-          setPriceFlash(data.price > prev ? "up" : "down");
-          setTimeout(() => setPriceFlash(null), 600);
-        }
-
-        prevPriceRef.current = data.price;
-        setPrice(data.price);
-      } catch {
-        if (active) setPrice(null);
-      }
-    }
-
-    fetchPrice();
-    const timer = setInterval(fetchPrice, PRICE_POLL_MS);
     return () => {
       active = false;
-      clearInterval(timer);
     };
-  }, [pair]);
+  }, [pair, interval]);
+
+  useEffect(() => {
+    if (livePrice == null) return;
+
+    const prev = prevPriceRef.current;
+    if (prev !== null && livePrice !== prev) {
+      setPriceFlash(livePrice > prev ? "up" : "down");
+      const timer = setTimeout(() => setPriceFlash(null), 600);
+      prevPriceRef.current = livePrice;
+      return () => clearTimeout(timer);
+    }
+
+    prevPriceRef.current = livePrice;
+  }, [livePrice]);
 
   if (loading) {
     return (
@@ -81,18 +92,22 @@ export function VerdictCard({ pair, interval }: VerdictCardProps) {
       <div className="mb-4 pb-4 border-b border-white/8">
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs text-text-muted uppercase tracking-wider">Current Price</p>
-          <span className="flex items-center gap-1.5 text-[10px] text-bull uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-bull pulse-dot" />
-            Live
-          </span>
+          {livePrice != null ? (
+            <span className="flex items-center gap-1.5 text-[10px] text-bull uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-bull pulse-dot" />
+              Live
+            </span>
+          ) : (
+            <span className="text-[10px] text-text-muted uppercase tracking-wider">Syncing</span>
+          )}
         </div>
         <p
           className={`font-mono-data text-2xl sm:text-3xl font-bold transition-colors duration-300 ${
             priceFlash === "up" ? "text-bull" : priceFlash === "down" ? "text-bear" : "text-text-primary"
           }`}
         >
-          {price != null
-            ? `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+          {livePrice != null
+            ? `$${livePrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
             : "—"}
         </p>
         <p className="text-xs text-text-muted font-mono-data mt-1">{pair}</p>

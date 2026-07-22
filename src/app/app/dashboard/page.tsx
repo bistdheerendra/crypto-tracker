@@ -6,9 +6,9 @@ import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
-import type { NewsItem, Verdict } from "@/lib/types";
+import type { CalendarEvent, NewsItem, Verdict } from "@/lib/types";
 
-import { DASHBOARD_PAIRS, TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
+import { DASHBOARD_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 
 export default function DashboardPage() {
   const [verdicts, setVerdicts] = useState<Verdict[]>([]);
@@ -20,6 +20,11 @@ export default function DashboardPage() {
     loading: loadingNews,
     error: newsError,
   } = useRadarFeed<NewsItem>("news", 60_000);
+  const {
+    data: events,
+    loading: loadingEvents,
+    error: eventsError,
+  } = useRadarFeed<CalendarEvent>("events", 300_000);
 
   useEffect(() => {
     Promise.all(
@@ -74,18 +79,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-6 mb-8">
-        <GlassCard>
-          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Active Signals</p>
-          <p className="font-mono-data text-2xl sm:text-3xl font-bold text-accent">{verdicts.length}</p>
-        </GlassCard>
-        <GlassCard>
-          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Watchlist</p>
-          <p className="font-mono-data text-2xl sm:text-3xl font-bold">{TRACKED_PAIRS.length} pairs</p>
-        </GlassCard>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-6 mb-8">
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h2 className="text-lg font-semibold">Latest Verdicts</h2>
@@ -175,6 +169,61 @@ export default function DashboardPage() {
               </GlassCard>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h2 className="text-lg font-semibold">Crypto Event Calendar</h2>
+          <span className="text-xs text-text-muted">Times in IST · updates every 5m</span>
+        </div>
+        {eventsError && (
+          <GlassCard className="mb-3 !p-3">
+            <p className="text-sm text-bear">{eventsError}</p>
+          </GlassCard>
+        )}
+        <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
+          {loadingEvents && (
+            <>
+              {[0, 1, 2].map((i) => (
+                <GlassCard key={i} className="!p-3">
+                  <p className="text-sm text-text-muted skeleton h-14" />
+                </GlassCard>
+              ))}
+            </>
+          )}
+          {!loadingEvents && events.length === 0 && !eventsError && (
+            <GlassCard className="!p-3">
+              <p className="text-sm text-text-muted">No upcoming crypto events right now.</p>
+            </GlassCard>
+          )}
+          {events.map((event) => (
+            <GlassCard key={event.id} className="!p-3 !rounded-none">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="font-mono-data text-xs text-accent">
+                  {event.dateIst} · {event.timeIst}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-text-muted">
+                  {event.category}
+                </span>
+                <span className="text-[10px] uppercase tracking-wider text-text-muted ml-auto">
+                  {event.source}
+                </span>
+              </div>
+              {event.url ? (
+                <a
+                  href={event.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm hover:text-accent transition-colors"
+                >
+                  {event.title}
+                </a>
+              ) : (
+                <p className="text-sm">{event.title}</p>
+              )}
+            </GlassCard>
+          ))}
         </div>
       </div>
     </div>

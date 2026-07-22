@@ -15,10 +15,13 @@
     "extract-training-data": "tsx scripts/extract-training-data.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.18",
+    "@ai-sdk/google": "^4.0.21",
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
     "@types/three": "^0.185.1",
     "@upstash/redis": "^1.38.0",
+    "ai": "^7.0.34",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.42.2",
     "lightweight-charts": "^5.2.0",

@@ -4,8 +4,8 @@ import { useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 
 const AI_MODELS = [
-  { id: "claude-sonnet-5", label: "Claude Sonnet 5" },
-  { id: "gpt-5.6", label: "GPT-5.6" },
+  { id: "gemini-flash", label: "Gemini 2.5 Flash (free)" },
+  { id: "claude-sonnet-5", label: "Claude Sonnet 4.5" },
 ] as const;
 
 interface Message {
@@ -17,7 +17,7 @@ export default function CopilotPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "bot",
-      text: "I'm your Dheerendra Intelligence copilot. Ask me about any Binance-listable crypto pair — I'll anchor every answer to live price data. Not financial advice.",
+      text: "I'm your Dheerendra Intelligence copilot. Ask about BTC/ETH/SOL… — set GEMINI_API_KEY (free) or ANTHROPIC_API_KEY for LLM answers with live price, verdicts & headlines. Not financial advice.",
     },
   ]);
   const [input, setInput] = useState("");

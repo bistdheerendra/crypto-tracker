@@ -10,7 +10,7 @@ UI brand: **Dheerendra Intelligence**. Informational tool only — not financial
 2. **Radar** — whales, ETF flows, liquidations, news
 3. **Backtest** — persist → resolve → track record + equity simulator
 4. **Scenarios** — BTC-shock portfolio stress test
-5. **Copilot** — chat with live price context (rule-based today)
+5. **Copilot** — chat with live price + LLM (Anthropic) when key is set
 
 ## Tech stack
 
@@ -62,6 +62,9 @@ Without a real `DATABASE_URL`, the app still runs; verdicts stay in **process me
 | GET | `/api/health` | Ops snapshot (DB, backtest, env presence) |
 | GET/POST | `/api/cron/resolve-verdicts` | Resolve open verdict outcomes |
 | GET/POST | `/api/cron/generate-verdicts` | Auto-analyze all tracked pairs × timeframes |
+| GET/POST | `/api/cron/check-alerts` | Radar spike → Telegram |
+| GET/PUT | `/api/settings` | Alert preferences |
+| POST | `/api/settings/test-telegram` | Test Telegram alert |
 
 ## Cron scheduling
 
@@ -69,27 +72,31 @@ Without a real `DATABASE_URL`, the app still runs; verdicts stay in **process me
 cannot run more often than once per day, so those entries are a **safety-net fallback**
 — not the primary schedule.
 
-Frequent runs are handled externally via [cron-job.org](https://cron-job.org) (or any
-HTTP scheduler) hitting the same routes:
+Frequent runs are handled by **GitHub Actions** (see [`docs/CRON.md`](./docs/CRON.md))
+and/or [cron-job.org](https://cron-job.org):
 
 | Job | Production URL | Suggested schedule | Auth |
 |-----|----------------|--------------------|------|
 | Resolve open verdicts | `GET https://<domain>/api/cron/resolve-verdicts` | every **15 min** | `Authorization: Bearer <CRON_SECRET>` if set |
 | Generate new verdicts | `GET https://<domain>/api/cron/generate-verdicts` | every **30 min** | same |
+| Radar / Telegram alerts | `GET https://<domain>/api/cron/check-alerts` | every **10–15 min** | same |
+
+**GitHub Actions secrets:** `CRON_BASE_URL`, `CRON_SECRET`  
+Workflow: `.github/workflows/frequent-cron.yml`
 
 Vercel fallback schedules in `vercel.json`:
 - `/api/cron/resolve-verdicts` → `0 0 * * *` (00:00 UTC daily)
 - `/api/cron/generate-verdicts` → `0 1 * * *` (01:00 UTC daily)
+- `/api/cron/check-alerts` → `0 2 * * *` (02:00 UTC daily)
 
-Both crons are idempotent; overlapping Vercel + external hits are safe.
+All crons are idempotent; overlapping Vercel + external hits are safe.
+
+Radar deep-dive: [`docs/INSTITUTIONAL-RADAR.md`](./docs/INSTITUTIONAL-RADAR.md)  
+Cron setup: [`docs/CRON.md`](./docs/CRON.md)
 
 ## Documentation
 
-**Complete architecture & how the system works:**
-
-→ **[`docs/PROJECT.md`](./docs/PROJECT.md)**
-
-Radar deep-dive: [`docs/INSTITUTIONAL-RADAR.md`](./docs/INSTITUTIONAL-RADAR.md)
+**Complete architecture:** [`docs/PROJECT.md`](./docs/PROJECT.md)
 
 Env templates: [`.env.example`](./.env.example)
 
