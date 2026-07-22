@@ -45,7 +45,7 @@ export default function SettingsPage() {
               Link your Telegram to receive signal alerts in real time.
             </p>
             <a
-              href="https://t.me/DeepCurrentBot?start=link_token"
+              href="https://t.me/Bistdheeru_bot?start=link_token"
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setTelegramLinked(true)}
