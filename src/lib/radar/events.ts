@@ -158,7 +158,7 @@ async function fetchPaprikaEvents(): Promise<CalendarEvent[]> {
       if (!res.ok) throw new Error(`CoinPaprika ${coin.id} failed`);
       const items = (await res.json()) as PaprikaEvent[];
       return items
-        .map((item) => {
+        .map((item): CalendarEvent | null => {
           const eventDate = new Date(item.date);
           if (Number.isNaN(eventDate.getTime()) || eventDate.getTime() < floor) {
             return null;
@@ -173,7 +173,7 @@ async function fetchPaprikaEvents(): Promise<CalendarEvent[]> {
             timeIst,
             url: item.link ?? undefined,
             source: "CoinPaprika",
-          } satisfies CalendarEvent;
+          };
         })
         .filter((e): e is CalendarEvent => e !== null);
     })
