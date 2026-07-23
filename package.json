@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "extract-training-data": "tsx scripts/extract-training-data.ts"
+    "extract-training-data": "tsx scripts/extract-training-data.ts",
+    "train-model": "python ml/train.py"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.18",

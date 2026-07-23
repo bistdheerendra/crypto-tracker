@@ -166,12 +166,12 @@ async function main(): Promise<void> {
     return row;
   });
 
-  const numericColumns: string[] = ["rMultiple", ...NUMERIC_FEATURE_KEYS];
+  // Feature columns only — rMultiple is a regression *target*, never drop/fill it.
   const droppedColumns: string[] = [];
   const filledColumns: { column: string; filledCount: number; median: number }[] =
     [];
 
-  const activeNumericColumns = numericColumns.filter((col) => {
+  const activeFeatureColumns = NUMERIC_FEATURE_KEYS.filter((col) => {
     const nullCount = rawRows.filter(
       (row) => row[col] === "" || row[col] === null || row[col] === undefined,
     ).length;
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
   const columns: string[] = [
     "label",
     "outcome",
-    ...activeNumericColumns.filter((c) => c === "rMultiple"),
+    "rMultiple",
     "pair",
     "direction",
     "directionEncoded",
@@ -224,7 +224,7 @@ async function main(): Promise<void> {
     "timeframe",
     "hourOfDay",
     "dayOfWeek",
-    ...activeNumericColumns.filter((c) => c !== "rMultiple"),
+    ...activeFeatureColumns,
     ...pairColumns,
     "createdAt",
   ];

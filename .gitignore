@@ -47,3 +47,6 @@ next-env.d.ts
 
 # generated ML datasets
 /ml/data/
+
+# trained model artifacts
+/ml/models/

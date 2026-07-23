@@ -293,9 +293,11 @@ normalized = Σ(laneScore × weight) / Σ(weight)
 
 | Normalized | Direction | Tier |
 |------------|-----------|------|
-| `> 0.8` | LONG | `> 1.5` → HIGH, else MODERATE |
-| `< -0.8` | SHORT | `< -1.5` → HIGH, else MODERATE |
+| `> 0.8` | LONG | HIGH only if `> 1.5` **and** ≥3 BULL lanes **and** Narrative ≠ BEAR; else MODERATE |
+| `< -0.8` | SHORT | HIGH only if `< -1.5` **and** ≥3 BEAR lanes **and** Narrative ≠ BULL; else MODERATE |
 | otherwise | NEUTRAL | MODERATE |
+
+Score-alone HIGH was too easy (e.g. equal-weight 4× MODERATE → `2.0`) and produced weak / conflicting “HIGH” labels.
 
 **Default lane weights** (jab tak ≥30 resolved trades na hoon):
 
@@ -392,6 +394,8 @@ Teen-step pipeline:
 **Caveat:** Bina `DATABASE_URL` ke verdict store **process memory** hai — restart pe data lose. Postgres set hone par durable.
 
 **ML extract:** `npm run extract-training-data` → resolved verdicts + features → CSV (`scripts/extract-training-data.ts`).
+
+**ML train (Stage 3 baseline):** `pip install -r ml/requirements.txt` then `npm run train-model` / `python ml/train.py` → `ml/models/`.
 
 ### 6.6 Scenarios (`/app/scenarios`)
 

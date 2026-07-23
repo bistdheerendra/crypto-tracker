@@ -28,6 +28,44 @@ const TIER_SCORE: Record<Tier, number> = {
   LOW: 1,
 };
 
+/** Minimum lanes that must share the trade-direction bias for a HIGH verdict. */
+const HIGH_MIN_DIRECTION_AGREEMENT = 3;
+
+/**
+ * HIGH requires strong score AND real consensus:
+ * - |normalized| past the HIGH threshold
+ * - ≥3 lanes biased with the trade (BULL for LONG, BEAR for SHORT)
+ * - Narrative must not oppose the trade direction
+ *
+ * Score-alone HIGH was too easy (e.g. 4× MODERATE → 2.0) and produced
+ * 0% win-rate HIGH batches with only 2/4 agreement or opposing Narrative.
+ */
+export function qualifiesAsHigh(
+  normalized: number,
+  direction: Direction,
+  lanes: LaneOutput[]
+): boolean {
+  if (direction === "LONG") {
+    if (!(normalized > 1.5)) return false;
+  } else if (direction === "SHORT") {
+    if (!(normalized < -1.5)) return false;
+  } else {
+    return false;
+  }
+
+  const targetBias: Bias = direction === "LONG" ? "BULL" : "BEAR";
+  const agreement = lanes.filter((l) => l.bias === targetBias).length;
+  if (agreement < HIGH_MIN_DIRECTION_AGREEMENT) return false;
+
+  const narrative = lanes.find((l) => l.lane === "Narrative");
+  if (narrative) {
+    if (direction === "LONG" && narrative.bias === "BEAR") return false;
+    if (direction === "SHORT" && narrative.bias === "BULL") return false;
+  }
+
+  return true;
+}
+
 export async function synthesizeVerdict(
   lanes: LaneOutput[],
   pair: string,
@@ -57,10 +95,10 @@ export async function synthesizeVerdict(
 
   if (normalized > 0.8) {
     direction = "LONG";
-    tier = normalized > 1.5 ? "HIGH" : "MODERATE";
+    tier = qualifiesAsHigh(normalized, direction, lanes) ? "HIGH" : "MODERATE";
   } else if (normalized < -0.8) {
     direction = "SHORT";
-    tier = normalized < -1.5 ? "HIGH" : "MODERATE";
+    tier = qualifiesAsHigh(normalized, direction, lanes) ? "HIGH" : "MODERATE";
   } else {
     tier = "MODERATE";
   }
