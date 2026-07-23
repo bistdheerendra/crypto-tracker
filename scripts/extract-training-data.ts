@@ -32,6 +32,10 @@ const NUMERIC_FEATURE_KEYS = [
   "dxyChangePct",
   "spxChangePct",
   "goldChangePct",
+  "whaleNetFlowUsd",
+  "whaleTransactionCount",
+  "liquidationNetImbalanceUsd",
+  "liquidationVolumeUsd",
   "laneAgreementCount",
 ] as const;
 

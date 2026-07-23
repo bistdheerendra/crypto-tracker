@@ -30,6 +30,12 @@ export interface VerdictFeaturePayload {
   spxChangePct: number | null;
   goldChangePct: number | null;
 
+  // Whale / liquidation (fixed lookback, independent of verdict TF)
+  whaleNetFlowUsd: number | null;
+  whaleTransactionCount: number | null;
+  liquidationNetImbalanceUsd: number | null;
+  liquidationVolumeUsd: number | null;
+
   // Meta
   confidenceTier: Tier;
   laneAgreementCount: number;
@@ -71,6 +77,13 @@ export interface MacroRawFeatures {
   goldChangePct: number | null;
 }
 
+export interface WhaleLiquidationRawFeatures {
+  whaleNetFlowUsd: number | null;
+  whaleTransactionCount: number | null;
+  liquidationNetImbalanceUsd: number | null;
+  liquidationVolumeUsd: number | null;
+}
+
 /** Lane runner result: public LaneOutput + optional raw numerics (stripped from API). */
 export interface LaneRunResult {
   output: LaneOutput;
@@ -97,6 +110,7 @@ export function buildVerdictFeatures(args: {
   flow: FlowRawFeatures | null;
   narrative: NarrativeRawFeatures | null;
   macro: MacroRawFeatures | null;
+  whaleLiquidation?: WhaleLiquidationRawFeatures | null;
   at?: Date;
 }): VerdictFeaturePayload {
   const at = args.at ?? new Date();
@@ -124,6 +138,12 @@ export function buildVerdictFeatures(args: {
     dxyChangePct: args.macro?.dxyChangePct ?? null,
     spxChangePct: args.macro?.spxChangePct ?? null,
     goldChangePct: args.macro?.goldChangePct ?? null,
+
+    whaleNetFlowUsd: args.whaleLiquidation?.whaleNetFlowUsd ?? null,
+    whaleTransactionCount: args.whaleLiquidation?.whaleTransactionCount ?? null,
+    liquidationNetImbalanceUsd:
+      args.whaleLiquidation?.liquidationNetImbalanceUsd ?? null,
+    liquidationVolumeUsd: args.whaleLiquidation?.liquidationVolumeUsd ?? null,
 
     confidenceTier: args.confidenceTier,
     laneAgreementCount: laneAgreementCount(args.lanes),

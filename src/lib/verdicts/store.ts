@@ -70,6 +70,10 @@ function rowToStored(row: {
     dxyChangePct: number | null;
     spxChangePct: number | null;
     goldChangePct: number | null;
+    whaleNetFlowUsd: number | null;
+    whaleTransactionCount: number | null;
+    liquidationNetImbalanceUsd: number | null;
+    liquidationVolumeUsd: number | null;
     confidenceTier: string;
     laneAgreementCount: number;
     pair: string;
@@ -100,6 +104,10 @@ function rowToStored(row: {
         dxyChangePct: row.features.dxyChangePct,
         spxChangePct: row.features.spxChangePct,
         goldChangePct: row.features.goldChangePct,
+        whaleNetFlowUsd: row.features.whaleNetFlowUsd,
+        whaleTransactionCount: row.features.whaleTransactionCount,
+        liquidationNetImbalanceUsd: row.features.liquidationNetImbalanceUsd,
+        liquidationVolumeUsd: row.features.liquidationVolumeUsd,
         confidenceTier: row.features.confidenceTier as Tier,
         laneAgreementCount: row.features.laneAgreementCount,
         pair: row.features.pair,
@@ -245,6 +253,10 @@ export async function saveVerdict(
               dxyChangePct: features.dxyChangePct,
               spxChangePct: features.spxChangePct,
               goldChangePct: features.goldChangePct,
+              whaleNetFlowUsd: features.whaleNetFlowUsd,
+              whaleTransactionCount: features.whaleTransactionCount,
+              liquidationNetImbalanceUsd: features.liquidationNetImbalanceUsd,
+              liquidationVolumeUsd: features.liquidationVolumeUsd,
               confidenceTier: features.confidenceTier,
               laneAgreementCount: features.laneAgreementCount,
               pair: features.pair,

@@ -1,6 +1,12 @@
 import { getFlowMetrics, formatFlowSources } from "@/lib/flow/aggregate";
 import { getMacroSnapshot } from "@/lib/macro";
+import {
+  WHALE_CHAIN_BY_PAIR,
+  WHALE_LIQUIDATION_LOOKBACK_MS,
+} from "@/lib/market/constants";
 import { getNarrativeSnapshot } from "@/lib/narrative";
+import { getLiquidationActivitySince } from "@/lib/radar/liquidations";
+import { getWhaleActivitySince } from "@/lib/radar/whales";
 import {
   runTechnicalLane,
   runFlowLane,
@@ -16,6 +22,7 @@ import {
   type MacroRawFeatures,
   type NarrativeRawFeatures,
   type TechnicalRawFeatures,
+  type WhaleLiquidationRawFeatures,
 } from "@/lib/verdicts/features";
 import { saveVerdict } from "@/lib/verdicts/store";
 import type { LaneOutput, Verdict } from "@/lib/types";
@@ -45,6 +52,17 @@ export async function runAnalysis(
   pair: string,
   timeframe: string
 ): Promise<AnalysisResult> {
+  const sinceMs = Date.now() - WHALE_LIQUIDATION_LOOKBACK_MS;
+  const whaleChain = WHALE_CHAIN_BY_PAIR[pair] ?? null;
+
+  // Whale/liq run in parallel with lane inputs; failures never block analyze.
+  const whaleLiqPromise = Promise.allSettled([
+    whaleChain
+      ? getWhaleActivitySince(whaleChain, sinceMs)
+      : Promise.resolve(null),
+    getLiquidationActivitySince(pair, sinceMs),
+  ]);
+
   const [klines, price, flow, narrative, macro] = await Promise.all([
     getKlines(pair, timeframe, 200),
     getPrice(pair),
@@ -84,6 +102,43 @@ export async function runAnalysis(
     lows
   );
 
+  const [whaleSettled, liqSettled] = await whaleLiqPromise;
+  const whaleLiquidation: WhaleLiquidationRawFeatures = {
+    whaleNetFlowUsd: null,
+    whaleTransactionCount: null,
+    liquidationNetImbalanceUsd: null,
+    liquidationVolumeUsd: null,
+  };
+
+  if (!whaleChain) {
+    // BNB/XRP etc. — no whale tracker coverage; leave whale fields null.
+  } else if (whaleSettled.status === "fulfilled" && whaleSettled.value) {
+    whaleLiquidation.whaleNetFlowUsd = whaleSettled.value.whaleNetFlowUsd;
+    whaleLiquidation.whaleTransactionCount =
+      whaleSettled.value.whaleTransactionCount;
+  } else if (whaleSettled.status === "rejected") {
+    console.warn(
+      "[features] whale activity unavailable:",
+      whaleSettled.reason instanceof Error
+        ? whaleSettled.reason.message
+        : String(whaleSettled.reason)
+    );
+  }
+
+  if (liqSettled.status === "fulfilled") {
+    whaleLiquidation.liquidationNetImbalanceUsd =
+      liqSettled.value.liquidationNetImbalanceUsd;
+    whaleLiquidation.liquidationVolumeUsd =
+      liqSettled.value.liquidationVolumeUsd;
+  } else {
+    console.warn(
+      "[features] liquidation activity unavailable:",
+      liqSettled.reason instanceof Error
+        ? liqSettled.reason.message
+        : String(liqSettled.reason)
+    );
+  }
+
   const features = buildVerdictFeatures({
     pair,
     timeframe,
@@ -93,6 +148,7 @@ export async function runAnalysis(
     flow: flowRun.raw as FlowRawFeatures | null,
     narrative: narrRun.raw as NarrativeRawFeatures | null,
     macro: macroRun.raw as MacroRawFeatures | null,
+    whaleLiquidation,
   });
 
   let persisted = false;

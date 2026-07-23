@@ -73,6 +73,12 @@ model VerdictFeature {
   spxChangePct              Float?
   goldChangePct             Float?
 
+  // Whale / liquidation (point-in-time Radar activity, fixed lookback)
+  whaleNetFlowUsd             Float? // signed: in − out USD in lookback (null if pair has no whale chain)
+  whaleTransactionCount       Int? // whale tx count in lookback (null if no whale chain)
+  liquidationNetImbalanceUsd  Float? // long liq USD − short liq USD in lookback
+  liquidationVolumeUsd        Float? // total liq USD (both sides) in lookback
+
   // Meta (duplicated for flat training extracts)
   confidenceTier            String
   laneAgreementCount        Int

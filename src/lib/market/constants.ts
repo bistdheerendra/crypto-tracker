@@ -23,3 +23,21 @@ export const DASHBOARD_PAIRS = [
   "SOL/USDT",
   "BNB/USDT",
 ] as const;
+
+/** Whale-tracker chains covered by Radar (Blockchair / Blockscout / Solana RPC). */
+export type WhaleChain = "Bitcoin" | "Ethereum" | "Solana";
+
+/**
+ * Pair → on-chain whale tracker. BNB/XRP have no whale coverage — leave null.
+ */
+export const WHALE_CHAIN_BY_PAIR: Partial<Record<string, WhaleChain>> = {
+  "BTC/USDT": "Bitcoin",
+  "ETH/USDT": "Ethereum",
+  "SOL/USDT": "Solana",
+};
+
+/**
+ * Fixed lookback for whale / liquidation point-in-time features.
+ * Independent of verdict timeframe — these are short-horizon activity signals.
+ */
+export const WHALE_LIQUIDATION_LOOKBACK_MS = 2 * 60 * 60 * 1000; // 2 hours

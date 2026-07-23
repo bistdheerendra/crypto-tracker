@@ -1,4 +1,5 @@
 import type { WhaleTransaction } from "@/lib/types";
+import type { WhaleChain } from "@/lib/market/constants";
 import { fetchJsonWithTimeout } from "@/lib/fetch-utils";
 import { formatTimeAgo, formatUsdCompact, truncateAddress } from "./utils";
 import { getPrice } from "@/lib/binance";
@@ -10,6 +11,8 @@ export const WHALE_THRESHOLDS = {
   SOL: 5_000,
   perChainLimit: 5,
   totalLimit: 10,
+  /** Higher limit for feature aggregation over the lookback window. */
+  activityLimit: 50,
 } as const;
 
 const BLOCKSTREAM_API = "https://blockstream.info/api";
@@ -54,6 +57,22 @@ interface BlockscoutPage {
   };
 }
 
+/** Unformatted whale tx for feature capture and Radar formatting. */
+export interface RawWhaleTx {
+  id: string;
+  hash: string;
+  amountNative: number;
+  usdValue: number;
+  direction: "in" | "out" | "unknown";
+  timestampMs: number;
+  chain: WhaleChain;
+}
+
+export interface WhaleActivitySummary {
+  whaleNetFlowUsd: number;
+  whaleTransactionCount: number;
+}
+
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 
 async function solanaRpc<T>(method: string, params: unknown[]): Promise<T> {
@@ -66,6 +85,24 @@ async function solanaRpc<T>(method: string, params: unknown[]): Promise<T> {
   const json = (await res.json()) as { result?: T; error?: unknown };
   if (json.error) throw new Error(`Solana RPC error: ${JSON.stringify(json.error)}`);
   return json.result as T;
+}
+
+function chainAssetSymbol(chain: WhaleChain): string {
+  if (chain === "Bitcoin") return "BTC";
+  if (chain === "Ethereum") return "ETH";
+  return "SOL";
+}
+
+function toWhaleTransaction(raw: RawWhaleTx): WhaleTransaction {
+  return {
+    id: raw.id,
+    address: truncateAddress(raw.hash, 6),
+    amount: `${raw.amountNative.toFixed(0)} ${chainAssetSymbol(raw.chain)}`,
+    usdValue: formatUsdCompact(raw.usdValue),
+    direction: raw.direction,
+    timeAgo: formatTimeAgo(new Date(raw.timestampMs)),
+    chain: raw.chain,
+  };
 }
 
 async function fetchBtcWhaleDirections(hashes: string[]): Promise<Map<string, "in" | "out" | "unknown">> {
@@ -92,7 +129,7 @@ async function fetchBtcWhaleDirections(hashes: string[]): Promise<Map<string, "i
   return directions;
 }
 
-async function fetchBtcWhalesBlockchair(minBtc: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchBtcWhalesBlockchair(minBtc: number, limit: number): Promise<RawWhaleTx[]> {
   const minSats = minBtc * 100_000_000;
   const data = await fetchJsonWithTimeout<{ data?: BlockchairTx[] }>(
     `https://api.blockchair.com/bitcoin/transactions?q=output_total(${minSats}..)&s=time(desc)&limit=${limit}`,
@@ -113,21 +150,21 @@ async function fetchBtcWhalesBlockchair(minBtc: number, limit: number): Promise<
     const hash = tx.hash ?? "unknown";
     return {
       id: `btc-${hash}-${i}`,
-      address: truncateAddress(hash, 6),
-      amount: `${btc.toFixed(0)} BTC`,
-      usdValue: formatUsdCompact(usd),
+      hash,
+      amountNative: btc,
+      usdValue: usd,
       direction: directions.get(hash) ?? "unknown",
-      timeAgo: formatTimeAgo(time),
-      chain: "Bitcoin",
+      timestampMs: time.getTime(),
+      chain: "Bitcoin" as const,
     };
   });
 }
 
-async function fetchBtcWhalesBlockstream(minBtc: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchBtcWhalesBlockstream(minBtc: number, limit: number): Promise<RawWhaleTx[]> {
   const minSats = minBtc * 100_000_000;
   const blocks = await fetchJsonWithTimeout<BlockstreamBlock[]>(`${BLOCKSTREAM_API}/blocks`, 8000);
   const btcPrice = await getPrice("BTC/USDT");
-  const results: WhaleTransaction[] = [];
+  const results: RawWhaleTx[] = [];
 
   for (const block of blocks.slice(0, 8)) {
     if (results.length >= limit) break;
@@ -151,11 +188,11 @@ async function fetchBtcWhalesBlockstream(minBtc: number, limit: number): Promise
 
         results.push({
           id: `btc-bs-${tx.txid}`,
-          address: truncateAddress(tx.txid, 6),
-          amount: `${btc.toFixed(0)} BTC`,
-          usdValue: formatUsdCompact(usd),
+          hash: tx.txid,
+          amountNative: btc,
+          usdValue: usd,
           direction: "unknown",
-          timeAgo: formatTimeAgo(time),
+          timestampMs: time.getTime(),
           chain: "Bitcoin",
         });
 
@@ -167,7 +204,7 @@ async function fetchBtcWhalesBlockstream(minBtc: number, limit: number): Promise
   return results;
 }
 
-async function fetchBtcWhales(minBtc: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchBtcWhalesRaw(minBtc: number, limit: number): Promise<RawWhaleTx[]> {
   try {
     const rows = await fetchBtcWhalesBlockchair(minBtc, limit);
     if (rows.length > 0) return rows;
@@ -183,7 +220,7 @@ async function fetchBtcWhales(minBtc: number, limit: number): Promise<WhaleTrans
   }
 }
 
-async function fetchEthWhalesBlockchair(minEth: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchEthWhalesBlockchair(minEth: number, limit: number): Promise<RawWhaleTx[]> {
   const minWei = minEth * 1e18;
   const data = await fetchJsonWithTimeout<{ data?: BlockchairTx[] }>(
     `https://api.blockchair.com/ethereum/transactions?q=value(${minWei}..)&s=time(desc)&limit=${limit}`,
@@ -197,22 +234,23 @@ async function fetchEthWhalesBlockchair(minEth: number, limit: number): Promise<
     const usd = eth * ethPrice;
     const time = tx.time ? new Date(tx.time) : new Date();
     const direction = (tx.balance_change ?? 0) >= 0 ? ("in" as const) : ("out" as const);
+    const hash = tx.hash ?? `unknown-${i}`;
     return {
-      id: `eth-${tx.hash ?? i}`,
-      address: truncateAddress(tx.hash ?? "unknown", 6),
-      amount: `${eth.toFixed(0)} ETH`,
-      usdValue: formatUsdCompact(usd),
+      id: `eth-${hash}`,
+      hash,
+      amountNative: eth,
+      usdValue: usd,
       direction,
-      timeAgo: formatTimeAgo(time),
-      chain: "Ethereum",
+      timestampMs: time.getTime(),
+      chain: "Ethereum" as const,
     };
   });
 }
 
-async function fetchEthWhalesBlockscout(minEth: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchEthWhalesBlockscout(minEth: number, limit: number): Promise<RawWhaleTx[]> {
   const minWei = minEth * 1e18;
   const ethPrice = await getPrice("ETH/USDT");
-  const results: WhaleTransaction[] = [];
+  const results: RawWhaleTx[] = [];
 
   let url: string | null = `${BLOCKSCOUT_API}/transactions?filter=validated`;
 
@@ -229,11 +267,11 @@ async function fetchEthWhalesBlockscout(minEth: number, limit: number): Promise<
 
       results.push({
         id: `eth-bs-${tx.hash}`,
-        address: truncateAddress(tx.hash, 6),
-        amount: `${eth.toFixed(0)} ETH`,
-        usdValue: formatUsdCompact(usd),
+        hash: tx.hash,
+        amountNative: eth,
+        usdValue: usd,
         direction: "unknown",
-        timeAgo: formatTimeAgo(time),
+        timestampMs: time.getTime(),
         chain: "Ethereum",
       });
 
@@ -250,7 +288,7 @@ async function fetchEthWhalesBlockscout(minEth: number, limit: number): Promise<
   return results;
 }
 
-async function fetchEthWhales(minEth: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchEthWhalesRaw(minEth: number, limit: number): Promise<RawWhaleTx[]> {
   try {
     const rows = await fetchEthWhalesBlockchair(minEth, limit);
     if (rows.length > 0) return rows;
@@ -324,7 +362,7 @@ function extractSolTransfersFromBlock(
   return transfers;
 }
 
-async function fetchSolWhales(minSol: number, limit: number): Promise<WhaleTransaction[]> {
+async function fetchSolWhalesRaw(minSol: number, limit: number): Promise<RawWhaleTx[]> {
   const minLamports = minSol * 1_000_000_000;
   const slot = await solanaRpc<number>("getSlot", []);
   const solPrice = await getPrice("SOL/USDT");
@@ -372,23 +410,65 @@ async function fetchSolWhales(minSol: number, limit: number): Promise<WhaleTrans
     const time = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
     return {
       id: `sol-${tx.signature.slice(0, 12)}-${i}`,
-      address: truncateAddress(tx.signature, 6),
-      amount: `${sol.toFixed(0)} SOL`,
-      usdValue: formatUsdCompact(usd),
+      hash: tx.signature,
+      amountNative: sol,
+      usdValue: usd,
       direction: "unknown" as const,
-      timeAgo: formatTimeAgo(time),
-      chain: "Solana",
+      timestampMs: time.getTime(),
+      chain: "Solana" as const,
     };
   });
 }
 
+/**
+ * Fast path for feature capture — skips Blockstream/Blockscout multi-page
+ * fallbacks that can add tens of seconds when Blockchair is rate-limited.
+ * Throws on hard failure so analyze can leave fields null via allSettled.
+ */
+async function fetchWhalesForChainActivity(
+  chain: WhaleChain,
+  limit: number
+): Promise<RawWhaleTx[]> {
+  const { BTC, ETH, SOL } = WHALE_THRESHOLDS;
+  if (chain === "Bitcoin") return fetchBtcWhalesBlockchair(BTC, limit);
+  if (chain === "Ethereum") return fetchEthWhalesBlockchair(ETH, limit);
+  return fetchSolWhalesRaw(SOL, limit);
+}
+
+/**
+ * Aggregate whale activity since `sinceMs` for a single chain.
+ * Net flow: in = +usd, out = −usd, unknown excluded from net but counted.
+ */
+export async function getWhaleActivitySince(
+  chain: WhaleChain,
+  sinceMs: number
+): Promise<WhaleActivitySummary> {
+  const rows = await fetchWhalesForChainActivity(
+    chain,
+    WHALE_THRESHOLDS.activityLimit
+  );
+  const inWindow = rows.filter((tx) => tx.timestampMs >= sinceMs);
+
+  let whaleNetFlowUsd = 0;
+  for (const tx of inWindow) {
+    if (tx.direction === "in") whaleNetFlowUsd += tx.usdValue;
+    else if (tx.direction === "out") whaleNetFlowUsd -= tx.usdValue;
+  }
+
+  return {
+    whaleNetFlowUsd,
+    whaleTransactionCount: inWindow.length,
+  };
+}
+
+/** Radar UI feed — same shape/limits as before; formatting applied on top of raw fetch. */
 export async function fetchWhaleTransactions(): Promise<WhaleTransaction[]> {
   const { BTC, ETH, SOL, perChainLimit, totalLimit } = WHALE_THRESHOLDS;
 
   const [btc, eth, sol] = await Promise.allSettled([
-    fetchBtcWhales(BTC, perChainLimit),
-    fetchEthWhales(ETH, perChainLimit),
-    fetchSolWhales(SOL, perChainLimit),
+    fetchBtcWhalesRaw(BTC, perChainLimit),
+    fetchEthWhalesRaw(ETH, perChainLimit),
+    fetchSolWhalesRaw(SOL, perChainLimit),
   ]);
 
   const merged = [
@@ -405,5 +485,5 @@ export async function fetchWhaleTransactions(): Promise<WhaleTransaction[]> {
     });
   }
 
-  return merged.slice(0, totalLimit);
+  return merged.slice(0, totalLimit).map(toWhaleTransaction);
 }
