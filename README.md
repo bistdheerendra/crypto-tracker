@@ -78,7 +78,7 @@ and/or [cron-job.org](https://cron-job.org):
 | Job | Production URL | Suggested schedule | Auth |
 |-----|----------------|--------------------|------|
 | Resolve open verdicts | `GET https://<domain>/api/cron/resolve-verdicts` | every **15 min** | `Authorization: Bearer <CRON_SECRET>` if set |
-| Generate new verdicts | `GET https://<domain>/api/cron/generate-verdicts` | every **30 min** | same |
+| Generate new verdicts | `GET https://<domain>/api/cron/generate-verdicts` | every **3 hours** | same |
 | Radar / Telegram alerts | `GET https://<domain>/api/cron/check-alerts` | every **10–15 min** | same |
 
 **GitHub Actions secrets:** `CRON_BASE_URL`, `CRON_SECRET`  

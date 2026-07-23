@@ -381,7 +381,7 @@ Teen-step pipeline:
    - `POST /api/backtest/simulate` → capital, risk%, date range → equity curve + trades
 
 **Cron schedules (dual setup — do not assume Vercel alone is enough):**
-- **Primary (frequent):** cron-job.org → resolve every 15m, generate every 30m
+- **Primary (frequent):** cron-job.org / GitHub Actions → resolve every 15m, generate every 3h
 - **Fallback (Hobby daily only):** `vercel.json` → resolve `0 0 * * *`, generate `0 1 * * *`
 - See README “Cron scheduling” for URL / header details. Both paths are idempotent.
 

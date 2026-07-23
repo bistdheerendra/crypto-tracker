@@ -9,7 +9,7 @@ import {
  * Auto-analyze all tracked pairs × timeframes to accumulate verdicts for ML.
  *
  * Scheduling (dual setup — see README “Cron scheduling”):
- * - Primary: external cron-job.org every ~30 minutes
+ * - Primary: external cron / GitHub Actions every ~3 hours
  * - Fallback: Vercel Hobby cron daily (`0 1 * * *` in vercel.json)
  * Overlapping hits are safe (idempotent; NEUTRAL results are not persisted).
  */
