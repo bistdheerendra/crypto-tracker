@@ -140,8 +140,10 @@ export async function GET() {
     const rows = await prisma.position.findMany({
       orderBy: { createdAt: "desc" },
     });
-    const positions = rows.map(serializePosition);
-    const pairs = [...new Set(positions.map((p: PositionRow) => p.assetSymbol))];
+    const positions: PositionRow[] = rows.map(serializePosition);
+    const pairs: string[] = [
+      ...new Set(positions.map((p) => p.assetSymbol)),
+    ];
     const signals = await loadSignalsForPairs(prisma, pairs);
 
     return NextResponse.json({ positions, signals, count: positions.length });
