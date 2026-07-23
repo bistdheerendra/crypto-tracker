@@ -5,15 +5,25 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
 import { EtfSourceBadge } from "@/components/radar/EtfSourceBadge";
 import { RadarTabMeta } from "@/components/radar/RadarTabMeta";
+import { NewsFeedList } from "@/components/radar/NewsFeedList";
+import { EventsFeedList } from "@/components/radar/EventsFeedList";
 import { whaleDirectionClass, whaleDirectionLabel } from "@/components/radar/whaleDirection";
-import type { ETFFlow, Liquidation, WhaleTransaction } from "@/lib/types";
+import type {
+  CalendarEvent,
+  ETFFlow,
+  Liquidation,
+  NewsItem,
+  WhaleTransaction,
+} from "@/lib/types";
 
-const TABS = ["Whales", "ETF Flows", "Liquidations"] as const;
+const TABS = ["Whales", "ETF Flows", "Liquidations", "News", "Events"] as const;
 
 const TAB_TYPE: Record<(typeof TABS)[number], string> = {
   Whales: "whales",
   "ETF Flows": "etf",
   Liquidations: "liquidations",
+  News: "news",
+  Events: "events",
 };
 
 export default function RadarPage() {
@@ -21,15 +31,27 @@ export default function RadarPage() {
   const whales = useRadarFeed<WhaleTransaction>("whales", 120_000);
   const etf = useRadarFeed<ETFFlow>("etf", 300_000);
   const liquidations = useRadarFeed<Liquidation>("liquidations", 30_000);
+  const news = useRadarFeed<NewsItem>("news", 60_000);
+  const events = useRadarFeed<CalendarEvent>("events", 300_000);
 
   const active =
-    activeTab === "Whales" ? whales : activeTab === "ETF Flows" ? etf : liquidations;
+    activeTab === "Whales"
+      ? whales
+      : activeTab === "ETF Flows"
+        ? etf
+        : activeTab === "Liquidations"
+          ? liquidations
+          : activeTab === "News"
+            ? news
+            : events;
+
+  const isListTab = activeTab === "News" || activeTab === "Events";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <h1 className="text-xl sm:text-2xl font-bold mb-1">Institutional Radar</h1>
       <p className="text-text-muted text-sm mb-6 sm:mb-8">
-        Whale movements, ETF activity, and liquidation events from live APIs.
+        Whale movements, ETF activity, liquidations, news, and upcoming events from live APIs.
       </p>
 
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1 -mx-1 px-1">
@@ -57,124 +79,134 @@ export default function RadarPage() {
         />
       </div>
 
-      {active.error && (
+      {active.error && !isListTab && (
         <GlassCard className="mb-4 !p-3">
           <p className="text-sm text-bear">{active.error}</p>
         </GlassCard>
       )}
 
-      <GlassCard className="!p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          {active.loading && (
-            <p className="text-sm text-text-muted p-6 skeleton h-32" />
-          )}
+      {activeTab === "News" && (
+        <NewsFeedList items={news.data} loading={news.loading} error={news.error} />
+      )}
 
-          {!active.loading && activeTab === "Whales" && (
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
-                  <th className="text-left py-3 px-4">Address</th>
-                  <th className="text-left py-3 px-4">Chain</th>
-                  <th className="text-left py-3 px-4">Amount</th>
-                  <th className="text-left py-3 px-4">USD Value</th>
-                  <th className="text-left py-3 px-4">Direction</th>
-                  <th className="text-left py-3 px-4">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {whales.data.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 px-4 text-center text-text-muted">
-                      No whale transactions found.
-                    </td>
+      {activeTab === "Events" && (
+        <EventsFeedList items={events.data} loading={events.loading} error={events.error} />
+      )}
+
+      {!isListTab && (
+        <GlassCard className="!p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            {active.loading && (
+              <p className="text-sm text-text-muted p-6 skeleton h-32" />
+            )}
+
+            {!active.loading && activeTab === "Whales" && (
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
+                    <th className="text-left py-3 px-4">Address</th>
+                    <th className="text-left py-3 px-4">Chain</th>
+                    <th className="text-left py-3 px-4">Amount</th>
+                    <th className="text-left py-3 px-4">USD Value</th>
+                    <th className="text-left py-3 px-4">Direction</th>
+                    <th className="text-left py-3 px-4">Time</th>
                   </tr>
-                ) : (
-                  whales.data.map((w) => (
-                    <tr key={w.id} className="border-t border-white/5 hover:bg-white/3">
-                      <td className="py-3 px-4 font-mono-data text-xs">{w.address}</td>
-                      <td className="py-3 px-4">{w.chain}</td>
-                      <td className="py-3 px-4 font-mono-data">{w.amount}</td>
-                      <td className="py-3 px-4 font-mono-data">{w.usdValue}</td>
-                      <td className={`py-3 px-4 font-mono-data font-semibold ${whaleDirectionClass(w.direction)}`}>
-                        {whaleDirectionLabel(w.direction)}
+                </thead>
+                <tbody>
+                  {whales.data.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 px-4 text-center text-text-muted">
+                        No whale transactions found.
                       </td>
-                      <td className="py-3 px-4 text-text-muted">{w.timeAgo}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+                  ) : (
+                    whales.data.map((w) => (
+                      <tr key={w.id} className="border-t border-white/5 hover:bg-white/3">
+                        <td className="py-3 px-4 font-mono-data text-xs">{w.address}</td>
+                        <td className="py-3 px-4">{w.chain}</td>
+                        <td className="py-3 px-4 font-mono-data">{w.amount}</td>
+                        <td className="py-3 px-4 font-mono-data">{w.usdValue}</td>
+                        <td className={`py-3 px-4 font-mono-data font-semibold ${whaleDirectionClass(w.direction)}`}>
+                          {whaleDirectionLabel(w.direction)}
+                        </td>
+                        <td className="py-3 px-4 text-text-muted">{w.timeAgo}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
 
-          {!active.loading && activeTab === "ETF Flows" && (
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
-                  <th className="text-left py-3 px-4">Ticker</th>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-right py-3 px-4">
-                    {etf.meta.source === "sosovalue" ? "Net Flow ($M)" : "Activity ($M)"}
-                  </th>
-                  <th className="text-left py-3 px-4">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {etf.data.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-6 px-4 text-center text-text-muted">
-                      No ETF data available.
-                    </td>
+            {!active.loading && activeTab === "ETF Flows" && (
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
+                    <th className="text-left py-3 px-4">Ticker</th>
+                    <th className="text-left py-3 px-4">Name</th>
+                    <th className="text-right py-3 px-4">
+                      {etf.meta.source === "sosovalue" ? "Net Flow ($M)" : "Activity ($M)"}
+                    </th>
+                    <th className="text-left py-3 px-4">Date</th>
                   </tr>
-                ) : (
-                  etf.data.map((e) => (
-                    <tr key={e.ticker} className="border-t border-white/5 hover:bg-white/3">
-                      <td className="py-3 px-4 font-mono-data font-semibold">{e.ticker}</td>
-                      <td className="py-3 px-4 text-text-muted">{e.name}</td>
-                      <td className={`py-3 px-4 font-mono-data text-right font-semibold ${e.netFlow >= 0 ? "text-bull" : "text-bear"}`}>
-                        {e.netFlow >= 0 ? "+" : ""}{e.netFlow.toFixed(1)}
+                </thead>
+                <tbody>
+                  {etf.data.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 px-4 text-center text-text-muted">
+                        No ETF data available.
                       </td>
-                      <td className="py-3 px-4 text-text-muted">{e.date}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
+                  ) : (
+                    etf.data.map((e) => (
+                      <tr key={e.ticker} className="border-t border-white/5 hover:bg-white/3">
+                        <td className="py-3 px-4 font-mono-data font-semibold">{e.ticker}</td>
+                        <td className="py-3 px-4 text-text-muted">{e.name}</td>
+                        <td className={`py-3 px-4 font-mono-data text-right font-semibold ${e.netFlow >= 0 ? "text-bull" : "text-bear"}`}>
+                          {e.netFlow >= 0 ? "+" : ""}{e.netFlow.toFixed(1)}
+                        </td>
+                        <td className="py-3 px-4 text-text-muted">{e.date}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
 
-          {!active.loading && activeTab === "Liquidations" && (
-            <table className="w-full text-sm min-w-[720px]">
-              <thead>
-                <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
-                  <th className="text-left py-3 px-4">Exchange</th>
-                  <th className="text-left py-3 px-4">Pair</th>
-                  <th className="text-left py-3 px-4">Side</th>
-                  <th className="text-right py-3 px-4">Amount</th>
-                  <th className="text-left py-3 px-4">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {liquidations.data.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-6 px-4 text-center text-text-muted">
-                      No recent liquidations found.
-                    </td>
+            {!active.loading && activeTab === "Liquidations" && (
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
+                    <th className="text-left py-3 px-4">Exchange</th>
+                    <th className="text-left py-3 px-4">Pair</th>
+                    <th className="text-left py-3 px-4">Side</th>
+                    <th className="text-right py-3 px-4">Amount</th>
+                    <th className="text-left py-3 px-4">Time</th>
                   </tr>
-                ) : (
-                  liquidations.data.map((l) => (
-                    <tr key={l.id} className="border-t border-white/5 hover:bg-white/3">
-                      <td className="py-3 px-4">{l.exchange}</td>
-                      <td className="py-3 px-4 font-mono-data">{l.pair}</td>
-                      <td className={`py-3 px-4 font-mono-data ${l.side === "long" ? "text-bear" : "text-bull"}`}>{l.side}</td>
-                      <td className="py-3 px-4 font-mono-data text-right">{l.amount}</td>
-                      <td className="py-3 px-4 text-text-muted">{l.timeAgo}</td>
+                </thead>
+                <tbody>
+                  {liquidations.data.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-6 px-4 text-center text-text-muted">
+                        No recent liquidations found.
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </GlassCard>
+                  ) : (
+                    liquidations.data.map((l) => (
+                      <tr key={l.id} className="border-t border-white/5 hover:bg-white/3">
+                        <td className="py-3 px-4">{l.exchange}</td>
+                        <td className="py-3 px-4 font-mono-data">{l.pair}</td>
+                        <td className={`py-3 px-4 font-mono-data ${l.side === "long" ? "text-bear" : "text-bull"}`}>{l.side}</td>
+                        <td className="py-3 px-4 font-mono-data text-right">{l.amount}</td>
+                        <td className="py-3 px-4 text-text-muted">{l.timeAgo}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </GlassCard>
+      )}
 
       <p className="text-xs text-text-muted mt-3">
         Source: {active.meta.source ?? TAB_TYPE[activeTab]} · auto-refreshes

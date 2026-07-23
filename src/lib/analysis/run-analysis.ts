@@ -6,7 +6,10 @@ import {
 } from "@/lib/market/constants";
 import { getNarrativeSnapshot } from "@/lib/narrative";
 import { getLiquidationActivitySince } from "@/lib/radar/liquidations";
-import { getWhaleActivitySince } from "@/lib/radar/whales";
+import {
+  getWhaleActivitySince,
+  isWhaleCaptureEnabled,
+} from "@/lib/radar/whales";
 import {
   runTechnicalLane,
   runFlowLane,
@@ -54,10 +57,14 @@ export async function runAnalysis(
 ): Promise<AnalysisResult> {
   const sinceMs = Date.now() - WHALE_LIQUIDATION_LOOKBACK_MS;
   const whaleChain = WHALE_CHAIN_BY_PAIR[pair] ?? null;
+  const whaleCaptureEnabled = isWhaleCaptureEnabled();
 
   // Whale/liq run in parallel with lane inputs; failures never block analyze.
+  // Whale capture is opt-in (WHALE_CAPTURE_ENABLED=true) — default off to avoid
+  // high-frequency Blockchair/Blockstream hits from the verdicts cron.
+  // Liquidation capture always runs.
   const whaleLiqPromise = Promise.allSettled([
-    whaleChain
+    whaleChain && whaleCaptureEnabled
       ? getWhaleActivitySince(whaleChain, sinceMs)
       : Promise.resolve(null),
     getLiquidationActivitySince(pair, sinceMs),
@@ -112,6 +119,8 @@ export async function runAnalysis(
 
   if (!whaleChain) {
     // BNB/XRP etc. — no whale tracker coverage; leave whale fields null.
+  } else if (!whaleCaptureEnabled) {
+    // Feature capture skipped (WHALE_CAPTURE_ENABLED≠true); leave whale fields null.
   } else if (whaleSettled.status === "fulfilled" && whaleSettled.value) {
     whaleLiquidation.whaleNetFlowUsd = whaleSettled.value.whaleNetFlowUsd;
     whaleLiquidation.whaleTransactionCount =
@@ -124,6 +133,7 @@ export async function runAnalysis(
         : String(whaleSettled.reason)
     );
   }
+  // fulfilled + null (fetch failed) → leave whale fields null (unknown, not zero)
 
   if (liqSettled.status === "fulfilled") {
     whaleLiquidation.liquidationNetImbalanceUsd =

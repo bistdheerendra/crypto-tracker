@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
-import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import { NewsFeedList } from "@/components/radar/NewsFeedList";
+import { EventsFeedList } from "@/components/radar/EventsFeedList";
 import type { CalendarEvent, NewsItem, Verdict } from "@/lib/types";
 
 import { DASHBOARD_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
@@ -142,33 +143,7 @@ export default function DashboardPage() {
             <h2 className="text-lg font-semibold">Live News Feed</h2>
             <span className="text-xs text-text-muted">Updates every 60s</span>
           </div>
-          {newsError && (
-            <GlassCard className="mb-3 !p-3">
-              <p className="text-sm text-bear">{newsError}</p>
-            </GlassCard>
-          )}
-          <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
-            {loadingNews && (
-              <GlassCard className="!p-3">
-                <p className="text-sm text-text-muted skeleton h-16" />
-              </GlassCard>
-            )}
-            {!loadingNews && news.length === 0 && !newsError && (
-              <GlassCard className="!p-3">
-                <p className="text-sm text-text-muted">No news available right now.</p>
-              </GlassCard>
-            )}
-            {news.map((item) => (
-              <GlassCard key={item.id} className="!p-3 !rounded-none">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-xs text-text-muted font-mono-data">{item.location} · {item.timeAgo}</span>
-                  <BiasPill bias={item.sentiment === "bullish" ? "BULL" : item.sentiment === "bearish" ? "BEAR" : "MIXED"} />
-                  <span className="text-[10px] uppercase tracking-wider text-accent ml-auto">{item.source}</span>
-                </div>
-                <p className="text-sm">{item.headline}</p>
-              </GlassCard>
-            ))}
-          </div>
+          <NewsFeedList items={news} loading={loadingNews} error={newsError} />
         </div>
       </div>
 
@@ -177,54 +152,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold">Crypto Event Calendar</h2>
           <span className="text-xs text-text-muted">Times in IST · updates every 5m</span>
         </div>
-        {eventsError && (
-          <GlassCard className="mb-3 !p-3">
-            <p className="text-sm text-bear">{eventsError}</p>
-          </GlassCard>
-        )}
-        <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
-          {loadingEvents && (
-            <>
-              {[0, 1, 2].map((i) => (
-                <GlassCard key={i} className="!p-3">
-                  <p className="text-sm text-text-muted skeleton h-14" />
-                </GlassCard>
-              ))}
-            </>
-          )}
-          {!loadingEvents && events.length === 0 && !eventsError && (
-            <GlassCard className="!p-3">
-              <p className="text-sm text-text-muted">No upcoming crypto events right now.</p>
-            </GlassCard>
-          )}
-          {events.map((event) => (
-            <GlassCard key={event.id} className="!p-3 !rounded-none">
-              <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <span className="font-mono-data text-xs text-accent">
-                  {event.dateIst} · {event.timeIst}
-                </span>
-                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-text-muted">
-                  {event.category}
-                </span>
-                <span className="text-[10px] uppercase tracking-wider text-text-muted ml-auto">
-                  {event.source}
-                </span>
-              </div>
-              {event.url ? (
-                <a
-                  href={event.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm hover:text-accent transition-colors"
-                >
-                  {event.title}
-                </a>
-              ) : (
-                <p className="text-sm">{event.title}</p>
-              )}
-            </GlassCard>
-          ))}
-        </div>
+        <EventsFeedList items={events} loading={loadingEvents} error={eventsError} />
       </div>
     </div>
   );

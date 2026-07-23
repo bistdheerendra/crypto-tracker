@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Radar,
   FlaskConical,
+  Briefcase,
   Settings,
   LogOut,
   Menu,
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/app/copilot", label: "Copilot", icon: MessageSquare },
   { href: "/app/radar", label: "Radar", icon: Radar },
   { href: "/app/scenarios", label: "Scenarios", icon: FlaskConical },
+  { href: "/app/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

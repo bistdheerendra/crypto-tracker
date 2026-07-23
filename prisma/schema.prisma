@@ -92,3 +92,19 @@ model VerdictFeature {
   @@index([pair, createdAt])
   @@map("verdict_features")
 }
+
+/// User-recorded holdings for the Portfolio Tracker (independent of Verdict ML pipeline).
+model Position {
+  id            String    @id @default(cuid())
+  assetSymbol   String
+  amount        Float
+  avgEntryPrice Float
+  positionType  String // "spot" | "long" | "short"
+  leverage      Float?
+  entryDate     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([assetSymbol])
+  @@map("positions")
+}

@@ -21,7 +21,7 @@ import {
 import { saveVerdict } from "../src/lib/verdicts/store";
 import type { LaneOutput, Verdict } from "../src/lib/types";
 
-const PAIRS = ["BTC/USDT", "XRP/USDT"] as const;
+const PAIRS = ["BTC/USDT", "ETH/USDT", "XRP/USDT"] as const;
 
 const stubLanes: LaneOutput[] = [
   {

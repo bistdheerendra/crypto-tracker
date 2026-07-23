@@ -1,7 +1,17 @@
 import type { WhaleTransaction } from "@/lib/types";
 import type { WhaleChain } from "@/lib/market/constants";
-import { fetchJsonWithTimeout } from "@/lib/fetch-utils";
-import { formatTimeAgo, formatUsdCompact, truncateAddress } from "./utils";
+import {
+  fetchErrorDetails,
+  fetchJsonWithTimeout,
+  HttpFetchError,
+} from "@/lib/fetch-utils";
+import {
+  formatTimeAgo,
+  formatUsdCompact,
+  getRadarCache,
+  setRadarCache,
+  truncateAddress,
+} from "./utils";
 import { getPrice } from "@/lib/binance";
 import { inferBtcDirection } from "./exchange-addresses";
 
@@ -14,6 +24,9 @@ export const WHALE_THRESHOLDS = {
   /** Higher limit for feature aggregation over the lookback window. */
   activityLimit: 50,
 } as const;
+
+/** Shared across Radar UI + VerdictFeature capture to cut duplicate Blockchair hits. */
+const BLOCKCHAIR_CACHE_TTL_MS = 7 * 60 * 1000;
 
 const BLOCKSTREAM_API = "https://blockstream.info/api";
 const BLOCKSCOUT_API = "https://eth.blockscout.com/api/v2";
@@ -73,7 +86,124 @@ export interface WhaleActivitySummary {
   whaleTransactionCount: number;
 }
 
+/**
+ * Feature-capture only. Radar UI (`fetchWhaleTransactions`) is unaffected.
+ * Default false — Blockchair 430 / Blockstream 429 make high-frequency capture
+ * poison the IP blacklist; set WHALE_CAPTURE_ENABLED=true to re-enable.
+ */
+export function isWhaleCaptureEnabled(): boolean {
+  return process.env.WHALE_CAPTURE_ENABLED === "true";
+}
+
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+const BLOCKCHAIR_COOLDOWN_KEY = "blockchair:ip-cooldown:v1";
+const BLOCKCHAIR_COOLDOWN_TTL_MS = 5 * 60 * 1000;
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withBlockchairKey(url: string): string {
+  const key = process.env.BLOCKCHAIR_API_KEY?.trim();
+  if (!key) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}key=${encodeURIComponent(key)}`;
+}
+
+function statusOf(err: unknown, details: ReturnType<typeof fetchErrorDetails>): number | null {
+  if (err instanceof HttpFetchError) return err.status;
+  return details.status;
+}
+
+/** 429 is transient — retry. 430 is IP blacklist — skip retries, cool down, fall back. */
+function isRetryableRateLimit(err: unknown, details: ReturnType<typeof fetchErrorDetails>): boolean {
+  const status = statusOf(err, details);
+  return status === 429 || /HTTP 429/.test(details.error);
+}
+
+function isBlockchairBlacklist(err: unknown, details: ReturnType<typeof fetchErrorDetails>): boolean {
+  const status = statusOf(err, details);
+  return status === 430 || /HTTP 430/.test(details.error);
+}
+
+async function markBlockchairCooldown(): Promise<void> {
+  await setRadarCache(BLOCKCHAIR_COOLDOWN_KEY, true, BLOCKCHAIR_COOLDOWN_TTL_MS);
+}
+
+async function isBlockchairInCooldown(): Promise<boolean> {
+  const cached = await getRadarCache<boolean>(BLOCKCHAIR_COOLDOWN_KEY);
+  return cached?.data === true;
+}
+
+/** Mirror CoinGecko retry in narrative.ts — only retry transient 429s, not 430 blacklists. */
+async function fetchBlockchairJsonWithRetry<T>(
+  url: string,
+  label: string,
+  attempts = 3
+): Promise<T> {
+  if (await isBlockchairInCooldown()) {
+    throw new HttpFetchError(
+      430,
+      url,
+      "Blockchair cooldown active after prior 430 blacklist"
+    );
+  }
+
+  const keyedUrl = withBlockchairKey(url);
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchJsonWithTimeout<T>(keyedUrl, 8000);
+    } catch (err) {
+      lastErr = err;
+      const details = fetchErrorDetails(err);
+      console.error(`[whales] Blockchair ${label} failed (attempt ${i + 1}/${attempts})`, {
+        url: keyedUrl.replace(/key=[^&]+/, "key=***"),
+        status: details.status,
+        error: details.error,
+        body: details.body,
+      });
+      if (isBlockchairBlacklist(err, details)) {
+        await markBlockchairCooldown();
+        break;
+      }
+      if (!isRetryableRateLimit(err, details) || i === attempts - 1) break;
+      await sleep(1000 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * Shared RawWhaleTx cache for Radar UI + feature capture (7m TTL).
+ * Populated by Blockchair when available, otherwise Blockstream/Blockscout fallbacks.
+ */
+async function getSharedBtcWhales(limit: number): Promise<RawWhaleTx[]> {
+  const cacheKey = `whales:btc:shared-raw:v1:${WHALE_THRESHOLDS.BTC}`;
+  const cached = await getRadarCache<RawWhaleTx[]>(cacheKey);
+  if (cached) return cached.data.slice(0, limit);
+
+  const rows = await fetchBtcWhalesRaw(
+    WHALE_THRESHOLDS.BTC,
+    WHALE_THRESHOLDS.activityLimit
+  );
+  // Cache hits (incl. empty) so Radar + feature capture don't re-hit upstream twice
+  await setRadarCache(cacheKey, rows, BLOCKCHAIR_CACHE_TTL_MS);
+  return rows.slice(0, limit);
+}
+
+async function getSharedEthWhales(limit: number): Promise<RawWhaleTx[]> {
+  const cacheKey = `whales:eth:shared-raw:v1:${WHALE_THRESHOLDS.ETH}`;
+  const cached = await getRadarCache<RawWhaleTx[]>(cacheKey);
+  if (cached) return cached.data.slice(0, limit);
+
+  const rows = await fetchEthWhalesRaw(
+    WHALE_THRESHOLDS.ETH,
+    WHALE_THRESHOLDS.activityLimit
+  );
+  await setRadarCache(cacheKey, rows, BLOCKCHAIR_CACHE_TTL_MS);
+  return rows.slice(0, limit);
+}
 
 async function solanaRpc<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(SOLANA_RPC, {
@@ -110,11 +240,11 @@ async function fetchBtcWhaleDirections(hashes: string[]): Promise<Map<string, "i
   if (hashes.length === 0) return directions;
 
   try {
-    const data = await fetchJsonWithTimeout<{
+    const data = await fetchBlockchairJsonWithRetry<{
       data?: Record<string, BlockchairTxDashboard>;
     }>(
       `https://api.blockchair.com/bitcoin/dashboards/transactions/${hashes.join(",")}`,
-      8000
+      "BTC directions"
     );
 
     for (const [hash, dashboard] of Object.entries(data.data ?? {})) {
@@ -122,21 +252,58 @@ async function fetchBtcWhaleDirections(hashes: string[]): Promise<Map<string, "i
       const outputs = (dashboard.outputs ?? []).map((o) => o.recipient ?? "");
       directions.set(hash, inferBtcDirection(inputs, outputs));
     }
-  } catch {
+  } catch (err) {
+    const details = fetchErrorDetails(err);
+    console.error("[whales] Blockchair BTC directions exhausted retries", {
+      status: details.status,
+      error: details.error,
+      body: details.body,
+      hashCount: hashes.length,
+    });
     for (const hash of hashes) directions.set(hash, "unknown");
   }
 
   return directions;
 }
 
-async function fetchBtcWhalesBlockchair(minBtc: number, limit: number): Promise<RawWhaleTx[]> {
-  const minSats = minBtc * 100_000_000;
-  const data = await fetchJsonWithTimeout<{ data?: BlockchairTx[] }>(
-    `https://api.blockchair.com/bitcoin/transactions?q=output_total(${minSats}..)&s=time(desc)&limit=${limit}`,
-    8000
-  );
+/**
+ * Always fetch activityLimit rows and cache raw Blockchair list so Radar (limit=5)
+ * and feature capture (limit=50) share one upstream call within the TTL window.
+ */
+async function getCachedBlockchairBtcTxs(minBtc: number): Promise<BlockchairTx[]> {
+  const cacheKey = `blockchair:btc:whale-txs:v1:${minBtc}`;
+  const cached = await getRadarCache<BlockchairTx[]>(cacheKey);
+  if (cached) return cached.data;
 
+  const minSats = minBtc * 100_000_000;
+  const limit = WHALE_THRESHOLDS.activityLimit;
+  const data = await fetchBlockchairJsonWithRetry<{ data?: BlockchairTx[] }>(
+    `https://api.blockchair.com/bitcoin/transactions?q=output_total(${minSats}..)&s=time(desc)&limit=${limit}`,
+    "BTC txs"
+  );
   const txs = data.data ?? [];
+  await setRadarCache(cacheKey, txs, BLOCKCHAIR_CACHE_TTL_MS);
+  return txs;
+}
+
+async function getCachedBlockchairEthTxs(minEth: number): Promise<BlockchairTx[]> {
+  const cacheKey = `blockchair:eth:whale-txs:v1:${minEth}`;
+  const cached = await getRadarCache<BlockchairTx[]>(cacheKey);
+  if (cached) return cached.data;
+
+  const minWei = minEth * 1e18;
+  const limit = WHALE_THRESHOLDS.activityLimit;
+  const data = await fetchBlockchairJsonWithRetry<{ data?: BlockchairTx[] }>(
+    `https://api.blockchair.com/ethereum/transactions?q=value(${minWei}..)&s=time(desc)&limit=${limit}`,
+    "ETH txs"
+  );
+  const txs = data.data ?? [];
+  await setRadarCache(cacheKey, txs, BLOCKCHAIR_CACHE_TTL_MS);
+  return txs;
+}
+
+async function fetchBtcWhalesBlockchair(minBtc: number, limit: number): Promise<RawWhaleTx[]> {
+  const txs = (await getCachedBlockchairBtcTxs(minBtc)).slice(0, limit);
   const hashes = txs.map((tx) => tx.hash).filter((h): h is string => !!h);
   const [btcPrice, directions] = await Promise.all([
     getPrice("BTC/USDT"),
@@ -209,27 +376,29 @@ async function fetchBtcWhalesRaw(minBtc: number, limit: number): Promise<RawWhal
     const rows = await fetchBtcWhalesBlockchair(minBtc, limit);
     if (rows.length > 0) return rows;
   } catch (err) {
-    console.error("[whales] Blockchair BTC failed:", err);
+    const details = fetchErrorDetails(err);
+    console.error("[whales] Blockchair BTC failed:", {
+      status: details.status,
+      error: details.error,
+      body: details.body,
+    });
   }
 
   try {
     return await fetchBtcWhalesBlockstream(minBtc, limit);
   } catch (err) {
     console.error("[whales] Blockstream BTC fallback failed:", err);
-    return [];
+    // Must throw — returning [] would become whaleNetFlowUsd/Count = 0 (false "no activity"
+    // signal for ML). Callers treat rejection / null as unknown.
+    throw err;
   }
 }
 
 async function fetchEthWhalesBlockchair(minEth: number, limit: number): Promise<RawWhaleTx[]> {
-  const minWei = minEth * 1e18;
-  const data = await fetchJsonWithTimeout<{ data?: BlockchairTx[] }>(
-    `https://api.blockchair.com/ethereum/transactions?q=value(${minWei}..)&s=time(desc)&limit=${limit}`,
-    8000
-  );
-
+  const txs = (await getCachedBlockchairEthTxs(minEth)).slice(0, limit);
   const ethPrice = await getPrice("ETH/USDT");
 
-  return (data.data ?? []).map((tx, i) => {
+  return txs.map((tx, i) => {
     const eth = (tx.output_total ?? tx.input_total ?? 0) / 1e18;
     const usd = eth * ethPrice;
     const time = tx.time ? new Date(tx.time) : new Date();
@@ -293,14 +462,21 @@ async function fetchEthWhalesRaw(minEth: number, limit: number): Promise<RawWhal
     const rows = await fetchEthWhalesBlockchair(minEth, limit);
     if (rows.length > 0) return rows;
   } catch (err) {
-    console.error("[whales] Blockchair ETH failed:", err);
+    const details = fetchErrorDetails(err);
+    console.error("[whales] Blockchair ETH failed:", {
+      status: details.status,
+      error: details.error,
+      body: details.body,
+    });
   }
 
   try {
     return await fetchEthWhalesBlockscout(minEth, limit);
   } catch (err) {
     console.error("[whales] Blockscout ETH fallback failed:", err);
-    return [];
+    // Must throw — returning [] would become whaleNetFlowUsd/Count = 0 (false "no activity"
+    // signal for ML). Callers treat rejection / null as unknown.
+    throw err;
   }
 }
 
@@ -421,32 +597,46 @@ async function fetchSolWhalesRaw(minSol: number, limit: number): Promise<RawWhal
 }
 
 /**
- * Fast path for feature capture — skips Blockstream/Blockscout multi-page
- * fallbacks that can add tens of seconds when Blockchair is rate-limited.
- * Throws on hard failure so analyze can leave fields null via allSettled.
+ * Fast path for feature capture. Prefers shared cache / Blockchair; falls back to
+ * Blockstream/Blockscout when Blockchair is rate-limited (same as Radar UI).
  */
 async function fetchWhalesForChainActivity(
   chain: WhaleChain,
   limit: number
 ): Promise<RawWhaleTx[]> {
-  const { BTC, ETH, SOL } = WHALE_THRESHOLDS;
-  if (chain === "Bitcoin") return fetchBtcWhalesBlockchair(BTC, limit);
-  if (chain === "Ethereum") return fetchEthWhalesBlockchair(ETH, limit);
-  return fetchSolWhalesRaw(SOL, limit);
+  if (chain === "Bitcoin") return getSharedBtcWhales(limit);
+  if (chain === "Ethereum") return getSharedEthWhales(limit);
+  return fetchSolWhalesRaw(WHALE_THRESHOLDS.SOL, limit);
 }
 
 /**
  * Aggregate whale activity since `sinceMs` for a single chain.
  * Net flow: in = +usd, out = −usd, unknown excluded from net but counted.
+ *
+ * Returns `null` when upstream fetch fails (unknown) — never `{0,0}`, which would
+ * be a false "confirmed zero activity" signal for ML training.
+ * A successful fetch with no txs in-window still returns zeros (confirmed quiet).
  */
 export async function getWhaleActivitySince(
   chain: WhaleChain,
   sinceMs: number
-): Promise<WhaleActivitySummary> {
-  const rows = await fetchWhalesForChainActivity(
-    chain,
-    WHALE_THRESHOLDS.activityLimit
-  );
+): Promise<WhaleActivitySummary | null> {
+  let rows: RawWhaleTx[];
+  try {
+    rows = await fetchWhalesForChainActivity(
+      chain,
+      WHALE_THRESHOLDS.activityLimit
+    );
+  } catch (err) {
+    const details = fetchErrorDetails(err);
+    console.error("[whales] activity fetch failed — leaving features null:", {
+      chain,
+      status: details.status,
+      error: details.error,
+    });
+    return null;
+  }
+
   const inWindow = rows.filter((tx) => tx.timestampMs >= sinceMs);
 
   let whaleNetFlowUsd = 0;
@@ -463,13 +653,24 @@ export async function getWhaleActivitySince(
 
 /** Radar UI feed — same shape/limits as before; formatting applied on top of raw fetch. */
 export async function fetchWhaleTransactions(): Promise<WhaleTransaction[]> {
-  const { BTC, ETH, SOL, perChainLimit, totalLimit } = WHALE_THRESHOLDS;
+  const { SOL, perChainLimit, totalLimit } = WHALE_THRESHOLDS;
 
+  // Soft-fail per chain for UI: empty rows on error (not ML features — zeros OK here).
   const [btc, eth, sol] = await Promise.allSettled([
-    fetchBtcWhalesRaw(BTC, perChainLimit),
-    fetchEthWhalesRaw(ETH, perChainLimit),
+    getSharedBtcWhales(perChainLimit),
+    getSharedEthWhales(perChainLimit),
     fetchSolWhalesRaw(SOL, perChainLimit),
   ]);
+
+  if (btc.status === "rejected") {
+    console.error("[whales] Radar BTC fetch failed:", btc.reason);
+  }
+  if (eth.status === "rejected") {
+    console.error("[whales] Radar ETH fetch failed:", eth.reason);
+  }
+  if (sol.status === "rejected") {
+    console.error("[whales] Radar SOL fetch failed:", sol.reason);
+  }
 
   const merged = [
     ...(btc.status === "fulfilled" ? btc.value : []),
