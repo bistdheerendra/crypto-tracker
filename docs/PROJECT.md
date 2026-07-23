@@ -315,9 +315,10 @@ Enough history ke baad weights historical lane accuracy se adjust hote hain.
 - Entry = current price
 - `riskReward` string e.g. `1:2.0`
 
-**Tracked pairs** (`src/lib/market/constants.ts`): BTC, ETH, SOL, BNB, XRP, PAXG (USDT).  
+**Tracked pairs** (`src/lib/market/constants.ts`): BTC, ETH, SOL, BNB, XRP (USDT).  
 **Timeframes:** `15m`, `30m`, `1h`, `4h`, `1d`.  
-**Dashboard subset:** BTC, ETH, SOL, PAXG.
+**Dashboard subset:** BTC, ETH, SOL, BNB.  
+*(PAXG dropped from auto-track — no OKX Flow fallback on Vercel; Copilot can still answer manual PAXG questions.)*
 
 ---
 
@@ -409,7 +410,7 @@ Teen-step pipeline:
 
 - Model dropdown maps to Anthropic Claude (Sonnet)
 - `POST /api/copilot` `{ message, model? }`
-- Message se symbol extract (BTC/ETH/SOL/BNB/XRP/PAXG, default BTC)
+- Message se symbol extract (BTC/ETH/SOL/BNB/XRP/PAXG, default BTC) — PAXG still recognized for manual asks, not auto-scheduled
 - Live price + 24h ticker + open verdicts + news headlines as context
 - `GEMINI_API_KEY` (free, preferred) ya `ANTHROPIC_API_KEY` → real LLM; warna **template fallback**
 - Default model: Gemini 2.5 Flash; Claude optional when Anthropic key set

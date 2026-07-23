@@ -1,10 +1,15 @@
+/**
+ * Actively scheduled / UI-tracked USDT pairs.
+ * PAXG/USDT was removed: no OKX perp (Flow fallback after Binance/Bybit
+ * geo-block on Vercel), so auto-generated Flow features were chronically null.
+ * Manual Copilot queries for PAXG still work; historical DB rows are kept.
+ */
 export const TRACKED_PAIRS = [
   "BTC/USDT",
   "ETH/USDT",
   "SOL/USDT",
   "BNB/USDT",
   "XRP/USDT",
-  "PAXG/USDT",
 ] as const;
 
 /** Timeframes used for analyze / dashboard / DB-persisted verdicts. */
@@ -16,5 +21,5 @@ export const DASHBOARD_PAIRS = [
   "BTC/USDT",
   "ETH/USDT",
   "SOL/USDT",
-  "PAXG/USDT",
+  "BNB/USDT",
 ] as const;

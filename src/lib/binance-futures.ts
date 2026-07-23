@@ -202,12 +202,14 @@ export async function getBinanceFlowMetrics(symbol: string): Promise<FlowMetrics
 
     let fundingRateRoc: number | null = null;
     if (!fundingHistResult.ok) {
-      console.warn(
+      console.error(
         "[binance-futures] fundingRateRoc unavailable: fundingRate history fetch failed",
         {
           symbol: pair,
+          url: endpoints.fundingRateHist,
           status: fundingHistResult.status,
           error: fundingHistResult.error,
+          body: fundingHistResult.body || undefined,
         }
       );
     } else {

@@ -35,8 +35,6 @@ const NUMERIC_FEATURE_KEYS = [
   "laneAgreementCount",
 ] as const;
 
-type NumericFeatureKey = (typeof NUMERIC_FEATURE_KEYS)[number];
-
 type FlatRow = Record<string, string | number>;
 
 function encodeConfidenceTier(tier: string): number {
@@ -141,6 +139,7 @@ async function main(): Promise<void> {
       label: computeLabel(verdict.outcome!),
       outcome: verdict.outcome!,
       rMultiple: verdict.rMultiple ?? "",
+      pair: verdict.pair,
       direction: verdict.direction,
       directionEncoded: encodeDirection(verdict.direction),
       confidenceTier: verdict.confidenceTier,
@@ -213,6 +212,7 @@ async function main(): Promise<void> {
     "label",
     "outcome",
     ...activeNumericColumns.filter((c) => c === "rMultiple"),
+    "pair",
     "direction",
     "directionEncoded",
     "confidenceTier",
