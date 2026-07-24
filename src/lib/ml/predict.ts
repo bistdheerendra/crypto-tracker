@@ -7,7 +7,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { InferenceSession, Tensor } from "onnxruntime-web";
+import { env, InferenceSession, Tensor } from "onnxruntime-web";
 import {
   MODEL_FEATURE_COLUMNS,
   type ModelFeatureColumn,
@@ -18,6 +18,12 @@ export type MlEdge = {
   winProbability: number;
   modelVersion: string;
 };
+
+// Vercel serverless tracing often drops ort-wasm*.mjs — load WASM from CDN.
+env.wasm.numThreads = 1;
+env.wasm.wasmPaths =
+  "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
+
 
 const MODELS_DIR = join(
   /* turbopackIgnore: true */ process.cwd(),
