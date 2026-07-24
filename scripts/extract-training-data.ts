@@ -6,6 +6,11 @@ import "dotenv/config";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPrisma } from "../src/lib/db";
+import {
+  encodeConfidenceTier,
+  encodeDirection,
+  pairColumnName,
+} from "../src/lib/ml/encoding";
 
 const MIN_RESOLVED_VERDICTS = 300;
 const PREFERRED_RESOLVED_VERDICTS = 500;
@@ -40,23 +45,6 @@ const NUMERIC_FEATURE_KEYS = [
 ] as const;
 
 type FlatRow = Record<string, string | number>;
-
-function encodeConfidenceTier(tier: string): number {
-  switch (tier.toUpperCase()) {
-    case "LOW":
-      return 1;
-    case "MODERATE":
-      return 2;
-    case "HIGH":
-      return 3;
-    default:
-      return 0;
-  }
-}
-
-function encodeDirection(direction: string): number {
-  return direction.toUpperCase() === "LONG" ? 1 : -1;
-}
 
 function computeLabel(outcome: string): number {
   return outcome === "tp1_hit" || outcome === "tp2_hit" ? 1 : 0;
@@ -135,7 +123,7 @@ async function main(): Promise<void> {
   }
 
   const distinctPairs = [...new Set(withFeatures.map((v) => v.pair))].sort();
-  const pairColumns = distinctPairs.map((p) => `pair_${p.replace(/[^a-zA-Z0-9]/g, "_")}`);
+  const pairColumns = distinctPairs.map((p) => pairColumnName(p));
 
   const rawRows: FlatRow[] = withFeatures.map((verdict) => {
     const { features } = verdict;

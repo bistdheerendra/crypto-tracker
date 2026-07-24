@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
+import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
@@ -15,31 +16,48 @@ const badgeColors: Record<string, string> = {
   M: "bg-bear/20 text-bear border-bear/30",
 };
 
+type MlEdgePayload = {
+  winProbability: number;
+  modelVersion: string;
+};
+
 export default function AnalyzePage() {
   const [pair, setPair] = useState("BTC/USDT");
   const [timeframe, setTimeframe] = useState("1h");
   const [lanes, setLanes] = useState<LaneOutput[]>([]);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [mlEdge, setMlEdge] = useState<MlEdgePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function runAnalysis() {
     setLoading(true);
     setError(null);
+    setMlEdge(null);
     try {
       const res = await fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`);
       const data = await res.json();
       if (!res.ok) {
         setLanes([]);
         setVerdict(null);
+        setMlEdge(null);
         setError(data.error ?? "Analysis failed.");
         return;
       }
       setLanes(data.lanes);
       setVerdict(data.verdict);
+      const edge = data.mlEdge as MlEdgePayload | null | undefined;
+      setMlEdge(
+        edge &&
+          typeof edge.winProbability === "number" &&
+          Number.isFinite(edge.winProbability)
+          ? edge
+          : null
+      );
     } catch {
       setLanes([]);
       setVerdict(null);
+      setMlEdge(null);
       setError("Could not reach analysis service.");
     }
     setLoading(false);
@@ -142,6 +160,7 @@ export default function AnalyzePage() {
                 NO TRADE
               </span>
             )}
+            {mlEdge != null && <MlEdgeBadge winProbability={mlEdge.winProbability} />}
             <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">

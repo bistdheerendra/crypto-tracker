@@ -3,8 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TierPill } from "@/components/ui/TierPill";
+import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
 import { intervalToApiTimeframe } from "@/lib/tradingview";
 import type { Verdict } from "@/lib/types";
+
+interface MlEdgePayload {
+  winProbability: number;
+  modelVersion: string;
+}
 
 interface VerdictCardProps {
   pair: string;
@@ -21,6 +27,7 @@ export function VerdictCard({
   onVerdictChange,
 }: VerdictCardProps) {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [mlEdge, setMlEdge] = useState<MlEdgePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [priceFlash, setPriceFlash] = useState<"up" | "down" | null>(null);
   const prevPriceRef = useRef<number | null>(null);
@@ -33,6 +40,7 @@ export function VerdictCard({
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setMlEdge(null);
     const timeframe = intervalToApiTimeframe(interval);
 
     fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
@@ -42,10 +50,21 @@ export function VerdictCard({
         const next = (d.verdict as Verdict | undefined) ?? null;
         setVerdict(next);
         onVerdictChangeRef.current?.(next);
+        const edge = d.mlEdge as MlEdgePayload | null | undefined;
+        if (
+          edge &&
+          typeof edge.winProbability === "number" &&
+          Number.isFinite(edge.winProbability)
+        ) {
+          setMlEdge(edge);
+        } else {
+          setMlEdge(null);
+        }
       })
       .catch(() => {
         if (!active) return;
         setVerdict(null);
+        setMlEdge(null);
         onVerdictChangeRef.current?.(null);
       })
       .finally(() => {
@@ -130,6 +149,7 @@ export function VerdictCard({
         >
           {verdict.direction}
         </span>
+        {mlEdge != null && <MlEdgeBadge winProbability={mlEdge.winProbability} />}
       </div>
       <p className="text-xs text-text-muted mb-4">{verdict.alignment}</p>
 

@@ -25,6 +25,7 @@ import {
   type MacroRawFeatures,
   type NarrativeRawFeatures,
   type TechnicalRawFeatures,
+  type VerdictFeaturePayload,
   type WhaleLiquidationRawFeatures,
 } from "@/lib/verdicts/features";
 import { saveVerdict } from "@/lib/verdicts/store";
@@ -35,6 +36,8 @@ export type AnalysisResult = {
   lanes: LaneOutput[];
   verdict: Verdict;
   price: number;
+  /** Point-in-time features (for ML display); not part of the public verdict DTO. */
+  features: VerdictFeaturePayload;
   dataSources: {
     klines: string;
     price: string;
@@ -182,6 +185,7 @@ export async function runAnalysis(
     lanes,
     verdict,
     price,
+    features,
     dataSources: {
       klines: "binance",
       price: "binance",
