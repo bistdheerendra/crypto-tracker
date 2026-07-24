@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       "./ml/models/feature_columns.json",
     ],
   },
-  serverExternalPackages: ["onnxruntime-node"],
+  serverExternalPackages: ["onnxruntime-web"],
 };
 
 export default nextConfig;

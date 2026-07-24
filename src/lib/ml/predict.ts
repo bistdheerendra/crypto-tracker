@@ -7,7 +7,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { InferenceSession, Tensor } from "onnxruntime-node";
+import { InferenceSession, Tensor } from "onnxruntime-web";
 import {
   MODEL_FEATURE_COLUMNS,
   type ModelFeatureColumn,
@@ -74,7 +74,9 @@ function loadSidecars(): boolean {
 async function getSession(): Promise<InferenceSession | null> {
   if (!loadSidecars()) return null;
   if (!sessionPromise) {
-    sessionPromise = InferenceSession.create(ONNX_PATH).catch((err) => {
+    sessionPromise = InferenceSession.create(ONNX_PATH, {
+      executionProviders: ["wasm"],
+    }).catch((err) => {
       console.error(
         "[ml] ONNX session create failed:",
         err instanceof Error ? err.message : String(err)
