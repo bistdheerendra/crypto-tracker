@@ -48,5 +48,9 @@ next-env.d.ts
 # generated ML datasets
 /ml/data/
 
-# trained model artifacts
-/ml/models/
+# trained model artifacts (keep ONNX + sidecars for Vercel Node inference)
+/ml/models/*
+!/ml/models/baseline_classifier.onnx
+!/ml/models/feature_medians.json
+!/ml/models/feature_columns.json
+!/ml/models/.gitkeep

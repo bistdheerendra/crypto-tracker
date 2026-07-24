@@ -1,10 +1,17 @@
 /**
- * Server-only: spawn ml/predict.py for display-time win probability.
+ * Server-only ML win-probability for display.
+ * Primary path: ONNX in-process (works on Vercel Node).
+ * Optional fallback: Python spawn (local only).
  * Never persists — callers must not write the result to the DB.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { InferenceSession, Tensor } from "onnxruntime-node";
+import {
+  MODEL_FEATURE_COLUMNS,
+  type ModelFeatureColumn,
+} from "./encoding";
 import type { MlFeatureVector } from "./build-feature-vector";
 
 export type MlEdge = {
@@ -12,25 +19,137 @@ export type MlEdge = {
   modelVersion: string;
 };
 
-const TIMEOUT_MS = 10_000; // cold sklearn+joblib import on Windows often exceeds 3s
+const MODELS_DIR = join(
+  /* turbopackIgnore: true */ process.cwd(),
+  "ml",
+  "models"
+);
+const ONNX_PATH = join(MODELS_DIR, "baseline_classifier.onnx");
+const MEDIANS_PATH = join(MODELS_DIR, "feature_medians.json");
+const COLUMNS_PATH = join(MODELS_DIR, "feature_columns.json");
 const PREDICT_SCRIPT = join(
   /* turbopackIgnore: true */ process.cwd(),
   "ml",
   "predict.py"
 );
-const MODEL_PATH = join(
-  /* turbopackIgnore: true */ process.cwd(),
-  "ml",
-  "models",
-  "baseline_classifier.joblib"
-);
+const PYTHON_TIMEOUT_MS = 10_000;
 
+type ModelMeta = {
+  feature_columns: string[];
+  modelVersion: string;
+};
+
+let sessionPromise: Promise<InferenceSession | null> | null = null;
+let medians: Record<string, number> | null = null;
+let meta: ModelMeta | null = null;
 let resolvedInterpreter: string | null | undefined;
 
-/**
- * Prefer python3, fall back to python. Cache the first working binary.
- * Logs which interpreter was chosen (or that none worked).
- */
+function loadSidecars(): boolean {
+  if (medians && meta) return true;
+  if (!existsSync(ONNX_PATH) || !existsSync(MEDIANS_PATH) || !existsSync(COLUMNS_PATH)) {
+    console.warn("[ml] ONNX artifacts missing:", {
+      onnx: existsSync(ONNX_PATH),
+      medians: existsSync(MEDIANS_PATH),
+      columns: existsSync(COLUMNS_PATH),
+      dir: MODELS_DIR,
+    });
+    return false;
+  }
+  try {
+    medians = JSON.parse(readFileSync(MEDIANS_PATH, "utf8")) as Record<
+      string,
+      number
+    >;
+    meta = JSON.parse(readFileSync(COLUMNS_PATH, "utf8")) as ModelMeta;
+    return true;
+  } catch (err) {
+    console.error(
+      "[ml] failed reading ONNX sidecars:",
+      err instanceof Error ? err.message : String(err)
+    );
+    return false;
+  }
+}
+
+async function getSession(): Promise<InferenceSession | null> {
+  if (!loadSidecars()) return null;
+  if (!sessionPromise) {
+    sessionPromise = InferenceSession.create(ONNX_PATH).catch((err) => {
+      console.error(
+        "[ml] ONNX session create failed:",
+        err instanceof Error ? err.message : String(err)
+      );
+      sessionPromise = null;
+      return null;
+    });
+  }
+  return sessionPromise;
+}
+
+function vectorToFloat32(features: MlFeatureVector): Float32Array {
+  const cols = meta?.feature_columns?.length
+    ? meta.feature_columns
+    : [...MODEL_FEATURE_COLUMNS];
+  const out = new Float32Array(cols.length);
+  for (let i = 0; i < cols.length; i++) {
+    const col = cols[i]!;
+    const raw = features[col as ModelFeatureColumn];
+    if (raw == null || !Number.isFinite(raw)) {
+      out[i] = medians?.[col] ?? 0;
+    } else {
+      out[i] = raw;
+    }
+  }
+  return out;
+}
+
+function extractWinProbability(outputs: Tensor[]): number | null {
+  // zipmap=False → typically [labels, probabilities] with probs shape [1, 2]
+  for (const t of outputs) {
+    const data = t.data;
+    if (!(data instanceof Float32Array) && !Array.isArray(data)) continue;
+    const arr = Array.from(data as ArrayLike<number>);
+    if (arr.length >= 2 && arr.every((n) => Number.isFinite(n))) {
+      // class-1 probability is usually index 1
+      const p = arr.length === 2 ? arr[1]! : arr[arr.length - 1]!;
+      if (p >= 0 && p <= 1) return p;
+    }
+  }
+  return null;
+}
+
+async function predictOnnx(features: MlFeatureVector): Promise<MlEdge | null> {
+  const session = await getSession();
+  if (!session || !meta) return null;
+
+  try {
+    const inputName = session.inputNames[0] ?? "float_input";
+    const floats = vectorToFloat32(features);
+    const tensor = new Tensor("float32", floats, [1, floats.length]);
+    const results = await session.run({ [inputName]: tensor });
+    const tensors = session.outputNames.map((n) => results[n]!);
+    const winProbability = extractWinProbability(tensors);
+    if (winProbability == null) {
+      console.warn(
+        "[ml] could not parse ONNX outputs:",
+        session.outputNames,
+        tensors.map((t) => ({ dims: t.dims, len: t.data.length }))
+      );
+      return null;
+    }
+    return {
+      winProbability,
+      modelVersion: meta.modelVersion || "baseline_onnx",
+    };
+  } catch (err) {
+    console.error(
+      "[ml] ONNX predict failed:",
+      err instanceof Error ? err.message : String(err)
+    );
+    return null;
+  }
+}
+
 function resolvePythonInterpreter(): string | null {
   if (resolvedInterpreter !== undefined) return resolvedInterpreter;
 
@@ -54,10 +173,6 @@ function resolvePythonInterpreter(): string | null {
         resolvedInterpreter = cmd;
         return cmd;
       }
-      console.warn(`[ml] interpreter "${cmd}" exited ${r.status}:`, {
-        stdout: r.stdout?.trim(),
-        stderr: r.stderr?.trim(),
-      });
     } catch (err) {
       console.warn(
         `[ml] interpreter probe threw for "${cmd}":`,
@@ -66,76 +181,18 @@ function resolvePythonInterpreter(): string | null {
     }
   }
 
-  console.error(
-    "[ml] no usable Python interpreter (tried python3, then python)"
-  );
   resolvedInterpreter = null;
   return null;
 }
 
-function parsePredictStdout(stdout: string): MlEdge | null {
-  const line = stdout
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .at(-1);
-  if (!line) return null;
-  try {
-    const parsed = JSON.parse(line) as {
-      winProbability?: unknown;
-      modelVersion?: unknown;
-      error?: unknown;
-    };
-    if (typeof parsed.error === "string") {
-      console.warn("[ml] predict.py error:", parsed.error);
-      return null;
-    }
-    if (
-      typeof parsed.winProbability !== "number" ||
-      !Number.isFinite(parsed.winProbability) ||
-      typeof parsed.modelVersion !== "string"
-    ) {
-      console.warn("[ml] unexpected predict.py payload:", line.slice(0, 200));
-      return null;
-    }
-    return {
-      winProbability: parsed.winProbability,
-      modelVersion: parsed.modelVersion,
-    };
-  } catch (err) {
-    console.warn(
-      "[ml] failed to parse predict.py stdout:",
-      err instanceof Error ? err.message : String(err),
-      line.slice(0, 200)
-    );
-    return null;
-  }
-}
-
-/**
- * Display-only ML edge. Returns null on missing model, spawn failure, timeout,
- * or bad output — never throws to callers.
- */
-export async function getMlEdge(
-  features: MlFeatureVector
-): Promise<MlEdge | null> {
-  if (!existsSync(MODEL_PATH)) {
-    console.warn("[ml] model missing, skipping edge:", MODEL_PATH);
-    return null;
-  }
-  if (!existsSync(PREDICT_SCRIPT)) {
-    console.warn("[ml] predict script missing:", PREDICT_SCRIPT);
-    return null;
-  }
-
+function predictPython(features: MlFeatureVector): Promise<MlEdge | null> {
   const python = resolvePythonInterpreter();
-  if (!python) return null;
+  if (!python || !existsSync(PREDICT_SCRIPT)) return Promise.resolve(null);
 
   return new Promise((resolve) => {
     let settled = false;
     let stdout = "";
     let stderr = "";
-
     const finish = (value: MlEdge | null) => {
       if (settled) return;
       settled = true;
@@ -161,14 +218,14 @@ export async function getMlEdge(
     }
 
     const timer = setTimeout(() => {
-      console.warn(`[ml] predict timed out after ${TIMEOUT_MS}ms — killing`);
+      console.warn(`[ml] python predict timed out after ${PYTHON_TIMEOUT_MS}ms`);
       try {
         child.kill("SIGKILL");
       } catch {
         // ignore
       }
       finish(null);
-    }, TIMEOUT_MS);
+    }, PYTHON_TIMEOUT_MS);
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -178,51 +235,74 @@ export async function getMlEdge(
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
     });
-
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
       console.error("[ml] child process error:", {
-        interpreter: python,
         code: err.code,
         message: err.message,
       });
       finish(null);
     });
-
-    child.on("close", (code, signal) => {
+    child.on("close", (code) => {
       clearTimeout(timer);
       if (stderr.trim()) {
         console.warn("[ml] predict.py stderr:", stderr.trim().slice(0, 500));
       }
       if (code !== 0) {
-        console.warn("[ml] predict.py exited non-zero:", {
-          code,
-          signal,
-          stdout: stdout.trim().slice(0, 300),
-        });
-        // Still try to parse JSON error line for logging
-        parsePredictStdout(stdout);
         finish(null);
         return;
       }
-      finish(parsePredictStdout(stdout));
+      try {
+        const line = stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+        if (!line) {
+          finish(null);
+          return;
+        }
+        const parsed = JSON.parse(line) as {
+          winProbability?: number;
+          modelVersion?: string;
+        };
+        if (
+          typeof parsed.winProbability === "number" &&
+          Number.isFinite(parsed.winProbability) &&
+          typeof parsed.modelVersion === "string"
+        ) {
+          finish({
+            winProbability: parsed.winProbability,
+            modelVersion: parsed.modelVersion,
+          });
+        } else {
+          finish(null);
+        }
+      } catch {
+        finish(null);
+      }
     });
 
     try {
       child.stdin.write(JSON.stringify(features), "utf8");
       child.stdin.end();
-    } catch (err) {
+    } catch {
       clearTimeout(timer);
-      console.error(
-        "[ml] failed writing stdin:",
-        err instanceof Error ? err.message : String(err)
-      );
-      try {
-        child.kill("SIGKILL");
-      } catch {
-        // ignore
-      }
       finish(null);
     }
   });
+}
+
+/**
+ * Display-only ML edge. Returns null on failure — never throws to callers.
+ * Prefers ONNX (Vercel-safe); falls back to Python spawn when available.
+ */
+export async function getMlEdge(
+  features: MlFeatureVector
+): Promise<MlEdge | null> {
+  const onnx = await predictOnnx(features);
+  if (onnx) return onnx;
+
+  // Local/dev fallback only — Vercel Node has no Python.
+  if (process.env.VERCEL) {
+    console.warn("[ml] ONNX unavailable on Vercel — mlEdge skipped");
+    return null;
+  }
+  return predictPython(features);
 }

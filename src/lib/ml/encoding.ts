@@ -2,14 +2,13 @@
  * Training/inference encoding shared with scripts/extract-training-data.ts.
  *
  * Source of truth for *which* columns the live model uses:
- *   joblib.load("ml/models/baseline_classifier.joblib")["feature_columns"]
- * (printed 2026-07-24 from baseline_classifier.joblib).
+ *   ml/models/feature_columns.json  (exported from baseline_classifier.joblib)
  *
  * Pair one-hot naming matches extract-training-data.ts:
  *   `pair_${pair.replace(/[^a-zA-Z0-9]/g, "_")}`
  */
 
-/** Exact column list & order from the saved model bundle. */
+/** Exact column list & order from the saved model bundle (28 features). */
 export const MODEL_FEATURE_COLUMNS = [
   "directionEncoded",
   "confidenceTierEncoded",
@@ -22,6 +21,9 @@ export const MODEL_FEATURE_COLUMNS = [
   "distanceToNearestSwingPct",
   "rsiMomentum",
   "volatilityRegime",
+  "oiChangePct",
+  "fundingRate",
+  "longShortRatio",
   "price24hChangePct",
   "fearGreedIndex",
   "trendingScore",

@@ -3,3 +3,8 @@ pandas>=2.2.0
 numpy>=1.26.0
 scikit-learn>=1.4.0
 joblib>=1.3.0
+
+# Optional — export ONNX for Vercel Node inference (ml/export_onnx.py)
+# skl2onnx>=1.16.0
+# onnx>=1.15.0
+# onnxruntime>=1.17.0

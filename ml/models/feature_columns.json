@@ -1,0 +1,33 @@
+{
+  "feature_columns": [
+    "directionEncoded",
+    "confidenceTierEncoded",
+    "hourOfDay",
+    "dayOfWeek",
+    "ema50",
+    "ema200",
+    "rsi14",
+    "priceDistanceToEma50Pct",
+    "distanceToNearestSwingPct",
+    "rsiMomentum",
+    "volatilityRegime",
+    "oiChangePct",
+    "fundingRate",
+    "longShortRatio",
+    "price24hChangePct",
+    "fearGreedIndex",
+    "trendingScore",
+    "fearGreedRoc",
+    "dxyChangePct",
+    "spxChangePct",
+    "goldChangePct",
+    "laneAgreementCount",
+    "pair_BNB_USDT",
+    "pair_BTC_USDT",
+    "pair_ETH_USDT",
+    "pair_PAXG_USDT",
+    "pair_SOL_USDT",
+    "pair_XRP_USDT"
+  ],
+  "modelVersion": "baseline_wf_fold3"
+}
