@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       "./ml/models/baseline_classifier.onnx",
       "./ml/models/feature_medians.json",
       "./ml/models/feature_columns.json",
+      "./ml/ort-wasm/**",
     ],
   },
   serverExternalPackages: ["onnxruntime-web"],

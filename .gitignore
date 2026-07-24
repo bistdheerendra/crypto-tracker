@@ -54,3 +54,6 @@ next-env.d.ts
 !/ml/models/feature_medians.json
 !/ml/models/feature_columns.json
 !/ml/models/.gitkeep
+
+# onnxruntime-web WASM binaries (required for Vercel inference)
+!/ml/ort-wasm/
