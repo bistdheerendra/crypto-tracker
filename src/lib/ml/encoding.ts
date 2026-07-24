@@ -8,7 +8,7 @@
  *   `pair_${pair.replace(/[^a-zA-Z0-9]/g, "_")}`
  */
 
-/** Exact column list & order from the saved model bundle (28 features). */
+/** Exact column list & order from the saved model bundle (30 features). */
 export const MODEL_FEATURE_COLUMNS = [
   "directionEncoded",
   "confidenceTierEncoded",
@@ -25,6 +25,8 @@ export const MODEL_FEATURE_COLUMNS = [
   "fundingRate",
   "longShortRatio",
   "price24hChangePct",
+  "fundingRateRoc",
+  "oiRoc",
   "fearGreedIndex",
   "trendingScore",
   "fearGreedRoc",
