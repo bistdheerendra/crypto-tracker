@@ -7,6 +7,23 @@
 
 ---
 
+## Changelog — 24 Jul 2026 (share with Claude)
+
+Aaj ka major work (yeh sections pehle outdated the — ab sync hain):
+
+| Area | Kya ship hua |
+|------|----------------|
+| **ML Stage 4 — live edge (display-only)** | Non-NEUTRAL `/api/analyze` ab `mlEdge: { winProbability, modelVersion }` return karta hai. ONNX in-process (`onnxruntime-web` + shipped WASM under `ml/ort-wasm/`). **Direction / SL / TP change nahi hote** — sirf UI badge. Score DB mein persist **nahi**. |
+| **Vercel ML path** | `next.config.ts` `outputFileTracingIncludes` for `/api/analyze` (ONNX + sidecars + WASM). Python spawn Vercel pe skip; local optional fallback. |
+| **Retrain** | Baseline retrain **680** resolved verdicts, **30** features (inkl. `fundingRateRoc` / `oiRoc`). Model version: `baseline_wf_fold3`. Walk-forward AUC weak / unstable (~0.41 avg) — badge pe “experimental”. |
+| **Charts / Analyze UX** | Pivot **support/resistance** overlays (`computeSupportResistanceLevels` → `structure` in analyze JSON). `VerdictCard` + `LiveCandleChart` overhaul; `MlEdgeBadge` on Analyze + Charts. |
+| **Radar News UI** | `NewsFeedList` polish; `/app/radar` pe **News + Events** tabs already live (pehle sirf Dashboard pe the). |
+| **Artifacts committed** | `ml/models/baseline_classifier.onnx` + `feature_columns.json` + `feature_medians.json` (+ `ml/ort-wasm/`) — joblib/CSV still gitignored. |
+
+**Still true:** ML does **not** gate or rewrite `synthesizeVerdict`. Auth still mock. No paywall.
+
+---
+
 ## 0. Short summary (Hinglish)
 
 DeepCurrent ek **Next.js** web app hai jo traders ko sirf chart nahi dikhata — **market move ke peeche ka cause** batata hai.
@@ -18,9 +35,9 @@ DeepCurrent ek **Next.js** web app hai jo traders ko sirf chart nahi dikhata —
 3. Non-neutral → Postgres mein save (+ point-in-time features, inkl. whale/liq)  
 4. Cron resolve → outcomes (`tp1_hit` / `tp2_hit` / `sl_hit` / `expired`)  
 5. Backtest track-record + equity simulator; optional Telegram alerts  
-6. Offline ML: features → CSV extract → baseline train (`ml/models/`) — **live inference abhi nahi**
+6. Offline ML train → **ONNX live inference (display-only win %)** on Analyze / Charts — verdict logic pe effect nahi
 
-Saath mein: Radar (whales / ETF / liquidations / news / events), Scenarios, Copilot (Gemini preferred).
+Saath mein: Radar (whales / ETF / liquidations / news / events), Portfolio tracker, Scenarios, Copilot (Gemini preferred).
 
 **Disclaimer:** Informational tool only — financial advice nahi. Pricing / paywall / tokens nahi. SEC filings / scrape pipeline nahi.
 
@@ -38,13 +55,14 @@ DeepCurrent ek hi pipeline mein sab jodta hai:
 
 | Layer | Kya milta hai | Status |
 |-------|----------------|--------|
-| **Analyze / Charts / Dashboard** | 4-lane analysis + synthesized trade idea | Shipped |
-| **Radar** | Institutional pulse — whales, ETF flows, liquidations (+ news/events on Dashboard) | Shipped |
+| **Analyze / Charts / Dashboard** | 4-lane analysis + synthesized trade idea + S/R structure + optional ML edge badge | Shipped |
+| **Radar** | Whales / ETF / liquidations / **news** / **events** (all tabs on `/app/radar` + news/events on Dashboard) | Shipped |
+| **Portfolio** | Spot / long / short holdings in Postgres (`positions`) + live marks + signal hints | Shipped |
 | **Backtest** | Verdicts save → resolve → win rate / equity simulator | Shipped |
 | **Alerts** | Verdict + radar-spike → Telegram | Shipped |
 | **Scenarios** | “Agar BTC −10%?” portfolio stress test | Shipped |
 | **Copilot** | Chat + live price + LLM (Gemini / Anthropic) + template fallback | Shipped |
-| **ML (offline)** | Feature capture → CSV → baseline classifier train | Stage 2–3 done; Stage 4 inference **not wired** |
+| **ML** | Capture → CSV → train → **ONNX display-only inference** on analyze | Stages 1–4 shipped; Stage 4 does **not** change verdict |
 
 ### Stack
 
@@ -56,7 +74,8 @@ DeepCurrent ek hi pipeline mein sab jodta hai:
 | 3D (landing) | Three.js |
 | Database | PostgreSQL (Supabase) via **Prisma 7** + `@prisma/adapter-pg` |
 | Optional cache | Upstash Redis (radar + alert prefs) |
-| ML (offline) | Python — HistGradientBoosting (`ml/train.py`) |
+| ML train (offline) | Python — HistGradientBoosting (`ml/train.py`) + ONNX export (`ml/export_onnx.py`) |
+| ML infer (live) | `onnxruntime-web` in Node (WASM under `ml/ort-wasm/`); optional local Python spawn |
 | Language | TypeScript |
 | Deploy | Vercel (`vercel.json` daily cron fallback + GitHub Actions / cron-job.org for frequent runs) |
 
@@ -93,12 +112,14 @@ flowchart TB
   end
 
   subgraph Product["Product surfaces"]
-    UI["Dashboard / Analyze / Charts / Radar / Backtest / Scenarios / Copilot / Settings"]
+    UI["Dashboard / Analyze / Charts / Radar / Portfolio / Backtest / Scenarios / Copilot / Settings"]
   end
 
-  subgraph ML["ML offline — Stage 2–3"]
+  subgraph ML["ML — Stage 1–4"]
     Extract["extract-training-data → CSV"]
-    Train["ml/train.py → joblib + metrics"]
+    Train["ml/train.py → joblib"]
+    Export["ml/export_onnx.py → ONNX + sidecars"]
+    Infer["getMlEdge ONNX → mlEdge badge (display only)"]
   end
 
   Spot & Flow & Narr & Macro --> Run
@@ -108,7 +129,8 @@ flowchart TB
   GenCron --> Run
   ResCron --> Save
   RadarSrc --> AlertCron --> TG
-  Save --> Extract --> Train
+  Save --> Extract --> Train --> Export
+  Run --> Infer
   Run & RadarSrc --> UI
   Save --> UI
 ```
@@ -122,17 +144,19 @@ sequenceDiagram
   participant Ext as Market APIs
   participant Synth as synthesizer + structure
   participant Store as verdicts/store
+  participant ML as getMlEdge ONNX
   participant TG as Telegram optional
 
   UI->>API: pair + timeframe
   API->>Ext: parallel: klines, price, flow, narrative, macro (+ whale/liq lookback)
   Ext-->>API: snapshots
-  API->>Synth: 4 lanes → weighted verdict + SL/TP
+  API->>Synth: 4 lanes → weighted verdict + SL/TP + S/R structure
   alt not NEUTRAL
     API->>Store: saveVerdict + features
+    API->>ML: buildMlFeatureVector → winProbability (display only, not saved)
     API->>TG: notifyVerdictAlert (prefs allow)
   end
-  API-->>UI: lanes, verdict, price, dataSources
+  API-->>UI: lanes, verdict, price, structure, dataSources, mlEdge
 ```
 
 ### Lifecycle — Track record
@@ -153,16 +177,16 @@ sequenceDiagram
   BT->>DB: track-record + simulate equity
 ```
 
-### Lifecycle — ML (offline only)
+### Lifecycle — ML (train offline + infer display-only)
 
 | Stage | Kya | Status |
 |-------|-----|--------|
 | **1 — Capture** | Analyze time pe `VerdictFeature` (lanes + whale/liq + meta) | Done — live |
 | **2 — Extract** | `npm run extract-training-data` → `ml/data/training_dataset.csv` | Done |
-| **3 — Train** | `npm run train-model` / `python ml/train.py` → `ml/models/` | Done (baseline) |
-| **4 — Inference** | Live `synthesizeVerdict` mein model score | **Not wired** |
+| **3 — Train + export** | `npm run train-model` → joblib; `python ml/export_onnx.py` → ONNX + medians + columns | Done (baseline, 680 rows / 30 feats) |
+| **4 — Inference** | `GET /api/analyze` → `getMlEdge()` → `mlEdge` badge on Analyze / Charts | Done — **display only**; never writes DB; never changes direction/SL/TP |
 
-Artifacts (`ml/data/`, `ml/models/`) local hain — **gitignored**. Baseline metrics weak edge dikhate hain; product gate nahi.
+Artifacts: ONNX + `feature_columns.json` + `feature_medians.json` + WASM **committed** (Vercel needs them). Joblib + CSV **gitignored**. Baseline metrics weak / fold-unstable — product gate nahi.
 
 ---
 
@@ -181,6 +205,7 @@ flowchart TB
     Radar["/api/radar"]
     Copilot["/api/copilot"]
     Backtest["/api/backtest/*"]
+    Portfolio["/api/portfolio"]
     Cron["/api/cron/*"]
     Corr["/api/scenarios/correlation"]
     Settings["/api/settings"]
@@ -189,11 +214,13 @@ flowchart TB
 
   subgraph Lib["src/lib"]
     Synth["analysis/run-analysis + synthesizer"]
+    ML["ml/predict ONNX"]
     Store["verdicts/store"]
     RadarLib["radar/*"]
     BT["backtest/*"]
     Alerts["alerts/*"]
     Scen["scenarios/*"]
+    Port["portfolio/*"]
   end
 
   subgraph Ext["External APIs"]
@@ -210,12 +237,15 @@ flowchart TB
   subgraph DB["Postgres (Supabase)"]
     VerdictsTable["verdicts"]
     FeaturesTable["verdict_features"]
+    PositionsTable["positions"]
   end
 
   App --> Hooks --> API
   Analyze --> Synth --> Store
+  Analyze --> ML
   Store --> VerdictsTable
   Store --> FeaturesTable
+  Portfolio --> Port --> PositionsTable
   Analyze --> Binance & Futures & Yahoo & CoinGecko
   Radar --> RadarLib --> RSS & Blockchair & OKX & Yahoo & SoSoValue
   Cron --> BT & Alerts --> Store & Binance
@@ -231,10 +261,11 @@ flowchart TB
 
 ```
 prisma/
-  schema.prisma              → Verdict + VerdictFeature
-  migrations/                → init + momentum/ROC + whale/liq features
+  schema.prisma              → Verdict + VerdictFeature + Position
+  migrations/                → init + momentum/ROC + whale/liq + positions
 prisma.config.ts             → Prisma v7 CLI (DIRECT_URL for migrations)
 vercel.json                  → Daily Vercel cron fallback
+next.config.ts               → ONNX/WASM file tracing for /api/analyze
 .github/workflows/
   frequent-cron.yml          → Primary frequent cron (resolve / generate / alerts)
 .env.example                 → Env templates
@@ -247,40 +278,45 @@ src/
     auth/login|signup        → Mock auth
     privacy|terms            → Legal
     app/                     → Product shell (AppShell)
-      dashboard|analyze|charts|backtest|copilot|radar|scenarios|settings
+      dashboard|analyze|charts|backtest|copilot|radar|scenarios|portfolio|settings
     api/                     → Route handlers
   components/
     landing/                 → Homepage sections (+ Three.js globe)
     app/AppShell.tsx         → Sidebar nav
-    charts/                  → Live candles + VerdictCard
+    charts/                  → Live candles + VerdictCard (+ S/R overlays)
     backtest/                → Simulator UI
     scenarios/               → Stress test UI
-    radar/                   → useRadarFeed + meta UI
-    ui/                      → GlassCard, BiasPill, TierPill, BrandLogo, …
+    radar/                   → useRadarFeed + News/Events lists + meta UI
+    ui/                      → GlassCard, BiasPill, TierPill, BrandLogo, MlEdgeBadge, …
   hooks/
     useLiveAnalysis.ts
     useCorrelationMatrix.ts
   lib/
-    analysis/                → run-analysis, 4 lanes, synthesis, structure
+    analysis/                → run-analysis, 4 lanes, synthesis, structure (S/R)
     backtest/                → Resolve, simulate, track record, lane weights
     radar/                   → News, whales, liquidations, ETF, events
     alerts/                  → Engine, Telegram notify, prefs
     flow/                    → Multi-exchange OI/funding aggregate
+    ml/                      → encoding, build-feature-vector, predict (ONNX)
     nlp/                     → Headline sentiment
     verdicts/                → Verdict store + ML feature capture
     scenarios/               → Portfolio stress + correlation
+    portfolio/               → Position types for tracker
     market/constants.ts      → Tracked pairs + timeframes
     db.ts                    → Lazy Prisma + pg adapter
     binance.ts / binance-futures.ts / macro.ts / narrative.ts
     tradingview.ts           → Chart helpers / pair prefs
     types.ts                 → Shared domain types
-  scripts/                   → extract-training-data, debug helpers
+  scripts/                   → extract-training-data, probe-ml-edge, debug helpers
 
 ml/
   train.py                   → Stage 3 baseline classifier
+  export_onnx.py             → joblib → ONNX + sidecars
+  predict.py                 → Optional local Python infer fallback
   requirements.txt
-  data/                      → CSVs (gitignored, local)
-  models/                    → joblib + metrics (gitignored, local)
+  data/                      → CSVs (gitignored)
+  models/                    → ONNX + columns + medians committed; joblib gitignored
+  ort-wasm/                  → onnxruntime-web WASM (committed for Vercel)
 
 docs/
   PROJECT.md                 → Yeh file
@@ -313,15 +349,16 @@ Wrapped by `src/app/app/layout.tsx` → `AppShell` sidebar (`src/components/app/
 | Route | Purpose |
 |-------|---------|
 | `/app/dashboard` | Live prices, multi-pair verdicts, **news + calendar events** |
-| `/app/analyze` | Manual 4-lane pipeline runner |
-| `/app/charts` | Live candles + side verdict card |
+| `/app/analyze` | Manual 4-lane pipeline runner + **ML edge badge** |
+| `/app/charts` | Live candles + S/R overlays + side verdict card (+ ML edge) |
 | `/app/backtest` | Track record + equity simulator |
 | `/app/copilot` | Chat UI (Gemini / Claude / template fallback) |
-| `/app/radar` | Whales / ETF / liquidations tables |
+| `/app/radar` | Whales / ETF / liquidations / **News** / **Events** tabs |
+| `/app/portfolio` | Holdings tracker (spot / long / short) in Postgres |
 | `/app/scenarios` | BTC shock portfolio stress test |
 | `/app/settings` | Telegram + alert prefs via `/api/settings` |
 
-**Nav order:** Dashboard → Analyze → Charts → Backtest → Copilot → Radar → Scenarios → Settings.
+**Nav order:** Dashboard → Analyze → Charts → Backtest → Copilot → Radar → Scenarios → Portfolio → Settings.
 
 **Auth note:** `/app/*` **ungated** — no `middleware.ts`. Login/signup sirf `localStorage` stub.
 
@@ -350,8 +387,10 @@ Yeh product ka heart hai. Entry: **`GET /api/analyze`** (shared: `src/lib/analys
 3. Char lane runners execute  
 4. `synthesizeVerdict()` weighted score → direction + tier  
 5. Structure / ATR → SL, TP1, TP2  
-6. Agar direction `NEUTRAL` nahi → `saveVerdict()` + point-in-time features + cache invalidate + optional Telegram  
-7. JSON: `{ lanes, verdict, price, dataSources }`
+6. Pivot S/R levels → `structure` (chart overlays)  
+7. Agar direction `NEUTRAL` nahi → `saveVerdict()` + point-in-time features + cache invalidate + optional Telegram  
+8. Non-NEUTRAL → `buildMlFeatureVector` + `getMlEdge()` → `mlEdge` (display only; failures → `null`)  
+9. JSON: `{ lanes, verdict, price, structure, dataSources, mlEdge }`
 
 ### Lane 1 — Technical (`runTechnicalLane`)
 
@@ -446,13 +485,14 @@ Enough history ke baad weights historical lane accuracy se adjust hote hain.
 
 - User pair + timeframe select karta hai
 - Hook: `useLiveAnalysis` → `GET /api/analyze`
-- 4 lane cards + final Verdict card
+- 4 lane cards + final Verdict card + **`MlEdgeBadge`** jab `mlEdge` non-null
 - Same analyze flow Charts ke `VerdictCard` mein reuse
 
 ### 7.3 Charts (`/app/charts`)
 
 - `LiveCandleChart`: pehle REST `/api/klines`, phir Binance WebSocket live updates
-- Side pe live verdict + price poll
+- Pivot **support / resistance** lines from analyze `structure` (`computeSupportResistanceLevels`)
+- Side pe live verdict + price poll + ML edge badge
 - Selected pair: `localStorage` key `dc_selected_pair` (`tradingview.ts`)
 
 ### 7.4 Radar (`/app/radar` + landing drawer)
@@ -465,16 +505,17 @@ Response: `{ type, data, source, cached, fetchedAt }`.
 
 | Type | Source | Cache TTL | UI |
 |------|--------|-----------|-----|
-| `news` | CoinDesk / CoinTelegraph / Decrypt RSS + keyword sentiment | ~60s | Dashboard (+ landing) |
+| `news` | CoinDesk / CoinTelegraph / Decrypt RSS + keyword sentiment | ~60s | `/app/radar` News tab + Dashboard (+ landing) |
 | `whales` | Blockchair BTC/ETH + Solana RPC (size thresholds) | ~120s | `/app/radar` |
 | `liquidations` | OKX REST + Binance/Bybit WebSocket (BTC/ETH/SOL) | ~30s | `/app/radar` |
 | `etf` | SoSoValue real net flows (`SOSOVALUE_API_KEY`) → fallback Yahoo proxy | ~300s | `/app/radar` |
-| `events` | Binance CMS + CoinPaprika calendar | short TTL | Dashboard |
+| `events` | Binance CMS + CoinPaprika calendar | short TTL | `/app/radar` Events tab + Dashboard |
 
 Cache: Upstash Redis (optional) ya in-memory fallback.
 
 Hook: `src/components/radar/useRadarFeed.ts`.  
-Libs: `src/lib/radar/` — `news.ts`, `whales.ts`, `etf-flows.ts`, `liquidations.ts`, `events.ts`, `providers/sosovalue.ts`, `utils.ts`, `format.ts`.
+Libs: `src/lib/radar/` — `news.ts`, `whales.ts`, `etf-flows.ts`, `liquidations.ts`, `events.ts`, `providers/sosovalue.ts`, `utils.ts`, `format.ts`.  
+UI lists: `NewsFeedList`, `EventsFeedList`.
 
 Koi Radar DB table nahi — live fetch + cache only. SEC filings / scrape **nahi**.
 
@@ -505,31 +546,51 @@ Teen-step pipeline:
 
 **Caveat:** Bina `DATABASE_URL` ke verdict store **process memory** hai — restart pe data lose. Postgres set hone par durable.
 
-### 7.6 ML pipeline (offline)
+### 7.6 ML pipeline (train + display-only live edge)
 
-| Step | Command | Output |
-|------|---------|--------|
+| Step | Command / path | Output |
+|------|----------------|--------|
 | Extract | `npm run extract-training-data` | `ml/data/training_dataset.csv` (+ preview) |
 | Train | `pip install -r ml/requirements.txt` then `npm run train-model` | `ml/models/baseline_classifier.joblib`, `baseline_metrics.json`, `feature_importance.csv` |
+| Export ONNX | `python ml/export_onnx.py` | `baseline_classifier.onnx`, `feature_columns.json`, `feature_medians.json` |
+| Live infer | `GET /api/analyze` → `src/lib/ml/predict.ts` | `mlEdge: { winProbability, modelVersion }` or `null` |
 
-- Features: technical / flow / narrative / macro + whale/liq + meta (tier, lane agreement, hour/day)
-- Model: HistGradientBoostingClassifier, time-ordered walk-forward
-- **Live analyze path model score use nahi karta** — Stage 4 pending
+**Live path (Stage 4):**
+1. Non-NEUTRAL verdict + features available  
+2. `buildMlFeatureVector()` — same 30-column encoding as training (`encoding.ts` / `feature_columns.json`)  
+3. `getMlEdge()` — primary: ONNX via `onnxruntime-web` + local WASM (`ml/ort-wasm/`); optional local Python `ml/predict.py` spawn; Vercel pe Python skip  
+4. UI: `MlEdgeBadge` on Analyze + Charts — **experimental**; tooltip notes weak walk-forward AUC  
+5. **Never persisted**; **never** fed into `synthesizeVerdict` / SL-TP
 
-### 7.7 Scenarios (`/app/scenarios`)
+**Current baseline (retrain 24 Jul 2026):** ~680 resolved rows, 30 features, modelVersion `baseline_wf_fold3`, avg ROC-AUC ~0.41 (unstable across folds). Not a trading gate.
 
-1. Positions `localStorage` (`dc_portfolio_positions`) mein
-2. Mark prices `/api/market` se refresh
-3. Correlation: Binance 1h klines, Pearson β vs BTC (`/api/scenarios/correlation`)
-4. User BTC shock % set karta hai
-5. `stressPortfolio()` → shocked price, PnL, stop-hit, funding/OI cascade
+**Vercel:** `next.config.ts` traces ONNX + sidecars + WASM into `/api/analyze` serverless bundle. `serverExternalPackages: ["onnxruntime-web"]`.
+
+### 7.7 Portfolio (`/app/portfolio`)
+
+- Postgres `positions` table (independent of verdict ML pipeline)
+- CRUD via `GET/POST/PATCH/DELETE /api/portfolio`
+- Types: `spot` | `long` | `short` (+ optional leverage)
+- Assets limited to `TRACKED_PAIRS`
+- Live marks + open-verdict signal hints on the page
+- Needs `DATABASE_URL` — without DB, API errors (no memory fallback for positions)
+
+### 7.8 Scenarios (`/app/scenarios`)
+
+1. Positions `localStorage` (`dc_portfolio_positions`) mein  
+2. Mark prices `/api/market` se refresh  
+3. Correlation: Binance 1h klines, Pearson β vs BTC (`/api/scenarios/correlation`)  
+4. User BTC shock % set karta hai  
+5. `stressPortfolio()` → shocked price, PnL, stop-hit, funding/OI cascade  
 6. Optional: open verdicts import → risk-sized positions (`verdict-import.ts`)
+
+**Note:** Scenarios localStorage portfolio ≠ Postgres Portfolio Tracker (`/app/portfolio`).
 
 **Libs:** `stress.ts`, `correlation.ts`, `positions-store.ts`, `mark-prices.ts`, `verdict-import.ts`  
 **Hook:** `useScenarioPortfolio`  
 **UI:** `ScenarioStressPanel`, `PositionControls`
 
-### 7.8 Copilot (`/app/copilot`)
+### 7.9 Copilot (`/app/copilot`)
 
 - Model dropdown maps to Gemini (default) / Anthropic Claude
 - `POST /api/copilot` `{ message, model? }`
@@ -538,7 +599,7 @@ Teen-step pipeline:
 - `GEMINI_API_KEY` (free, preferred) ya `ANTHROPIC_API_KEY` → real LLM; warna **template fallback**
 - Default model: Gemini 2.5 Flash
 
-### 7.9 Settings & Alerts (`/app/settings`)
+### 7.10 Settings & Alerts (`/app/settings`)
 
 - Telegram chat id + test alert (`POST /api/settings/test-telegram`)
 - Alert prefs: enabled, minTier, watchlist, radar spike toggles
@@ -549,7 +610,7 @@ Teen-step pipeline:
 
 **Libs:** `src/lib/alerts/` — engine, notify, telegram, prefs.
 
-### 7.10 Auth — mock
+### 7.11 Auth — mock
 
 - Login/signup: `localStorage.setItem("dc_auth", JSON.stringify({ email }))`
 - Password validate / store nahi hota
@@ -563,11 +624,12 @@ Teen-step pipeline:
 
 | Method | Path | Input | Output / role |
 |--------|------|-------|----------------|
-| GET | `/api/analyze` | `pair`, `timeframe` | `{ lanes, verdict, price, dataSources }` |
+| GET | `/api/analyze` | `pair`, `timeframe` | `{ lanes, verdict, price, structure, dataSources, mlEdge }` |
 | GET | `/api/market` | `symbol` | `{ symbol, price }` |
 | GET | `/api/klines` | `symbol`, `interval`, `limit` (max 500) | `{ candles: [{ time, open, high, low, close }] }` |
 | POST | `/api/copilot` | `{ message, model? }` | `{ reply, symbol, price }` |
 | GET | `/api/radar` | `type` = news\|whales\|liquidations\|etf\|events | `{ type, data, source, cached, fetchedAt }` |
+| GET/POST/PATCH/DELETE | `/api/portfolio` | position fields | CRUD on Postgres `positions` + marks / hints |
 | POST | `/api/backtest/simulate` | pair, dateRange, capital, risk, minTier… | Equity curve + trades + metrics |
 | GET | `/api/backtest/track-record` | — | Aggregate WR, lane accuracy, etc. |
 | GET | `/api/scenarios/correlation` | — | `{ matrix, cached, source }` |
@@ -578,6 +640,10 @@ Teen-step pipeline:
 | GET/PUT | `/api/settings` | prefs JSON | Alert preferences |
 | POST | `/api/settings/test-telegram` | — | Send test Telegram message |
 | GET | `/api/health` | — | DB / backtest / env presence snapshot |
+
+`mlEdge` shape: `{ winProbability: number, modelVersion: string } | null` — only for non-NEUTRAL; never stored.
+
+`structure` shape: `{ supports: number[], resistances: number[], swingLow, swingHigh }` — chart overlays.
 
 ### Analyze `dataSources` example
 
@@ -649,12 +715,14 @@ Templates: `.env.example`.
 |------|--------|----------|
 | Verdicts / backtest history | Postgres via Prisma when `DATABASE_URL` set; else in-memory | Yes with DB; no without |
 | Point-in-time lane features | `verdict_features` (or memory) | Same as verdicts |
+| Portfolio holdings | Postgres `positions` | Yes (requires DB) |
 | Radar / track-record caches | Upstash or in-memory Map + TTL | Redis yes / memory no |
 | Alert prefs | Upstash / in-memory (`alerts:prefs`) | Redis yes / memory no |
 | Auth stub | `localStorage` `dc_auth` | Browser only |
 | Chart pair | `localStorage` `dc_selected_pair` | Browser |
 | Scenario portfolio | `localStorage` `dc_portfolio_positions` | Browser |
-| ML CSV / models | `ml/data/`, `ml/models/` (gitignored) | Local disk only |
+| ML ONNX + sidecars + WASM | `ml/models/*.onnx|json`, `ml/ort-wasm/` (**committed**) | Repo / deploy bundle |
+| ML CSV / joblib | `ml/data/`, joblib under `ml/models/` (gitignored) | Local disk only |
 
 ### Database schema (Prisma)
 
@@ -662,6 +730,7 @@ Templates: `.env.example`.
 |---------------|---------|
 | `Verdict` → `verdicts` | Trade idea: pair, direction, tier, entry/SL/TP, lane biases, outcome |
 | `VerdictFeature` → `verdict_features` | Point-in-time raw lane numerics + whale/liq + meta (ML); 1:1 with verdict |
+| `Position` → `positions` | User holdings for Portfolio Tracker (spot/long/short) |
 
 **Feature groups on `VerdictFeature`:** technical (EMA/RSI/ATR regime…), flow (OI/funding/ROC…), narrative (F&G…), macro (DXY/SPX/Gold), whale/liq lookback USD fields, meta (tier, lane agreement, hour/day).
 
@@ -673,6 +742,7 @@ Migrations:
 - `init_verdicts`
 - `add_momentum_roc_features`
 - `add_whale_liquidation_features`
+- `add_positions`
 
 ---
 
@@ -718,7 +788,7 @@ Utilities: `.glass-card`, glow / pulse helpers.
 | Charts | `LiveCandleChart`, `VerdictCard` |
 | Backtest | `TrackRecordSummary`, `SimulatorPanel`, `EquityCurveChart` |
 | Scenarios | `ScenarioStressPanel`, `PositionControls` |
-| Shared UI | `GlassCard`, `BiasPill`, `TierPill`, `CoinIcon`, `ScrollReveal` |
+| Shared UI | `GlassCard`, `BiasPill`, `TierPill`, `CoinIcon`, `ScrollReveal`, `MlEdgeBadge` |
 | Landing | `Hero`, `EarthRadar`/`GlobeScene`, `Pipeline`, `Synthesis`, `Delivery`, `CopilotMock`, `RadarDrawer`, `ScenarioSimulator`, `FinalCTA`, `Footer`, `ProgressRail` |
 
 No shadcn / Redux — domain logic `src/lib/` mein, UI `src/components/` mein.
@@ -751,7 +821,7 @@ npm run dev                   # http://localhost:3000
 
 Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart pe lose).
 
-**Check paths:** `/` · `/app/dashboard` · `/app/analyze` · `/app/charts` · `/app/radar` · `/app/backtest` · `/app/scenarios` · `/app/copilot` · `/app/settings`
+**Check paths:** `/` · `/app/dashboard` · `/app/analyze` · `/app/charts` · `/app/radar` · `/app/portfolio` · `/app/backtest` · `/app/scenarios` · `/app/copilot` · `/app/settings`
 
 ---
 
@@ -759,30 +829,29 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 
 ### Shipped (wired & usable)
 
-- 4-lane analyze + synthesis + structure SL/TP  
+- 4-lane analyze + synthesis + structure SL/TP + pivot S/R overlays  
 - Multi-venue flow aggregation (Binance + Bybit + OKX)  
 - Persist verdicts + features (Postgres or memory), inkl. whale/liq features  
 - Cron generate / resolve / check-alerts (+ GHA workflow)  
 - Backtest track record + equity simulate + dynamic lane weights  
-- Institutional Radar (whales / ETF / liq) + news + events APIs  
-- Dashboard news/events; Radar page three tabs  
-- Scenarios stress + correlation  
+- Institutional Radar — whales / ETF / liq / **news** / **events** tabs  
+- Portfolio Tracker (Postgres `positions`)  
+- Scenarios stress + correlation (localStorage positions — separate from Portfolio)  
 - Copilot Gemini/Claude + template fallback  
 - Settings alert prefs + Telegram (verdict + radar)  
 - Health endpoint  
-- Offline ML Stage 2 extract + Stage 3 train  
+- ML Stages 1–3 offline + **Stage 4 ONNX display-only** (`mlEdge` badge)  
 
 ### Not yet / intentional gaps
 
 | Item | Reality |
 |------|---------|
-| **ML Stage 4 — live inference** | Train-only; scores do not affect `synthesizeVerdict` |
+| **ML gates / rewrites verdict** | Score is **display-only**; `synthesizeVerdict` unchanged |
+| **Strong ML edge** | Retrained on 680 rows; walk-forward AUC weak / unstable — not a product gate |
 | **Real auth / user accounts** | Mock `localStorage` only |
 | **SEC filings / scrape pipelines** | Absent by design so far |
-| **Radar News/Events tabs on `/app/radar`** | API exists; UI on Dashboard |
 | **Paywall / multi-tenant** | None |
-| **Strong ML edge** | Baseline trained; metrics weak; not a product gate |
-| **Durable everything without env** | Without DB/Redis, history/prefs ephemeral |
+| **Durable everything without env** | Without DB/Redis, history/prefs ephemeral; Portfolio needs DB |
 | **ETF real flows without SoSoValue key** | Yahoo **proxy** only |
 | **Whale features for BNB/XRP** | Intentionally null (no chain map) |
 
@@ -792,13 +861,13 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 
 1. **Auth is mock** — routes unprotected; no User table / sessions (intentional for solo use)
 2. **Copilot needs `GEMINI_API_KEY` (free) or `ANTHROPIC_API_KEY`** — without either, keyword templates still work
-3. **Memory fallback without DB / Redis** — backtest history + alert prefs ephemeral on restart
+3. **Memory fallback without DB / Redis** — backtest history + alert prefs ephemeral on restart; Portfolio has **no** memory fallback
 4. **ETF flows** — SoSoValue jab key ho; warna Yahoo **proxy**, issuer flow data nahi  
 5. **Branding mix** — package `deepcurrent`, UI “Dheerendra Intelligence”  
 6. **Supabase dual URL** — runtime 6543 vs migrate 5432  
 7. **Cron** — Vercel pe **daily** fallback; dense schedule via GitHub Actions / cron-job.org (`docs/CRON.md`)  
 8. **Telegram** — needs bot token + chat id; no BotFather deep-link OAuth flow  
-9. **ML** — offline baseline only; not in live verdict path  
+9. **ML** — live badge experimental; does not affect trade direction / levels; ONNX must ship with deploy  
 
 ---
 
@@ -807,13 +876,15 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 | User goal | UI | API | Lib |
 |-----------|-----|-----|-----|
 | 4-lane signal | Analyze / Charts / Dashboard | `/api/analyze` | `analysis/run-analysis`, `synthesizer` |
-| Live candles | Charts | `/api/klines` + Binance WS | `binance`, `tradingview` |
+| ML win % badge | Analyze / Charts | `/api/analyze` → `mlEdge` | `ml/predict`, `ml/build-feature-vector` |
+| Live candles + S/R | Charts | `/api/klines` + Binance WS + `structure` | `binance`, `analysis/structure` |
 | Market pulse | Radar / Dashboard | `/api/radar` | `radar/*` |
+| Holdings tracker | Portfolio | `/api/portfolio` | `portfolio/*`, Prisma `Position` |
 | Historical edge | Backtest | `/api/backtest/*` + cron | `backtest/*`, `verdicts/*` |
 | “Agar BTC −10%?” | Scenarios | `/api/scenarios/correlation`, `/api/market` | `scenarios/*` |
 | Ask a question | Copilot | `/api/copilot` | Gemini / Anthropic + template fallback |
 | Alerts | Settings | `/api/settings`, `/api/cron/check-alerts` | `alerts/*` + Telegram |
-| Train ML offline | CLI | — | `scripts/extract-training-data`, `ml/train.py` |
+| Train / export ML | CLI | — | `extract-training-data`, `ml/train.py`, `ml/export_onnx.py` |
 | Sign in | Auth pages | — | `localStorage` only |
 
 ---
@@ -830,4 +901,4 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 
 ---
 
-*Last updated: Jul 2026 — working tree reality: full analyze→persist→resolve→backtest loop + Radar/alerts/Copilot shipped; ML Stage 2–3 offline done; Stage 4 inference not wired. Jab APIs, storage, lane logic, ya cron change ho — is file ko sync rakho.*
+*Last updated: **24 Jul 2026** — ML Stage 4 ONNX display-only edge live on Analyze/Charts; retrain 680 verdicts / 30 features; chart S/R overlays; Radar News+Events tabs; Portfolio tracker. Verdict synthesis still rule-based (ML does not rewrite direction/SL/TP). Jab APIs, storage, lane logic, ya cron change ho — is file ko sync rakho.*
