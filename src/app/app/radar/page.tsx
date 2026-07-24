@@ -16,7 +16,7 @@ import type {
   WhaleTransaction,
 } from "@/lib/types";
 
-const TABS = ["Whales", "ETF Flows", "Liquidations", "News", "Events"] as const;
+const TABS = ["ETF Flows", "Whales", "Liquidations", "News", "Events"] as const;
 
 const TAB_TYPE: Record<(typeof TABS)[number], string> = {
   Whales: "whales",

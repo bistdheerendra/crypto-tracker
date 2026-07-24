@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       lanes: result.lanes,
       verdict: result.verdict,
       price: result.price,
+      structure: result.structure,
       dataSources: result.dataSources,
       mlEdge,
     });

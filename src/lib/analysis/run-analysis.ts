@@ -17,6 +17,10 @@ import {
   runMacroLane,
   synthesizeVerdict,
 } from "@/lib/analysis/synthesizer";
+import {
+  computeSupportResistanceLevels,
+  type SupportResistanceLevels,
+} from "@/lib/analysis/structure";
 import { invalidateCache } from "@/lib/backtest/cache";
 import { invalidateLaneWeightCache } from "@/lib/backtest/lane-weights";
 import {
@@ -36,6 +40,8 @@ export type AnalysisResult = {
   lanes: LaneOutput[];
   verdict: Verdict;
   price: number;
+  /** Pivot support / resistance levels for chart overlays. */
+  structure: SupportResistanceLevels;
   /** Point-in-time features (for ML display); not part of the public verdict DTO. */
   features: VerdictFeaturePayload;
   dataSources: {
@@ -112,6 +118,8 @@ export async function runAnalysis(
     lows
   );
 
+  const structure = computeSupportResistanceLevels(highs, lows, price);
+
   const [whaleSettled, liqSettled] = await whaleLiqPromise;
   const whaleLiquidation: WhaleLiquidationRawFeatures = {
     whaleNetFlowUsd: null,
@@ -185,6 +193,7 @@ export async function runAnalysis(
     lanes,
     verdict,
     price,
+    structure,
     features,
     dataSources: {
       klines: "binance",

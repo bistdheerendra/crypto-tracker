@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { LiveCandleChart, type ChartLevels } from "@/components/charts/LiveCandleChart";
 import { VerdictCard } from "@/components/charts/VerdictCard";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
-import type { Verdict } from "@/lib/types";
 import {
   TIMEFRAME_OPTIONS,
   getStoredPair,
@@ -12,21 +11,12 @@ import {
   type ChartInterval,
 } from "@/lib/tradingview";
 
-function levelsFromVerdict(verdict: Verdict | null): ChartLevels | null {
-  if (!verdict || verdict.direction === "NEUTRAL") return null;
-  return {
-    entry: verdict.entry,
-    stopLoss: verdict.stopLoss,
-    takeProfit1: verdict.takeProfit1,
-    takeProfit2: verdict.takeProfit2,
-  };
-}
-
 export default function ChartsPage() {
   const [pair, setPair] = useState("BTC/USDT");
   const [chartInterval, setChartInterval] = useState<ChartInterval>("60");
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [levels, setLevels] = useState<ChartLevels | null>(null);
+  const [showDrawings, setShowDrawings] = useState(true);
 
   useEffect(() => {
     setPair(getStoredPair());
@@ -48,7 +38,7 @@ export default function ChartsPage() {
         <div>
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5">Charts</h1>
           <p className="text-text-muted text-sm">
-            Live candles with verdict entry, stop, and take-profit levels.
+            Live candles with Analyzer support/resistance and trade levels.
           </p>
         </div>
 
@@ -81,6 +71,20 @@ export default function ChartsPage() {
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDrawings((prev) => !prev)}
+            aria-pressed={showDrawings}
+            title={showDrawings ? "Hide chart drawings" : "Show chart drawings"}
+            className={`px-3 py-2 rounded-lg text-sm font-mono-data whitespace-nowrap transition-colors ${
+              showDrawings
+                ? "bg-accent/15 text-accent border border-accent/30"
+                : "text-text-muted hover:text-text-primary bg-white/5 border border-white/8"
+            }`}
+          >
+            {showDrawings ? "Hide Levels" : "Show Levels"}
+          </button>
         </div>
       </div>
 
@@ -89,17 +93,17 @@ export default function ChartsPage() {
           <LiveCandleChart
             pair={pair}
             interval={chartInterval}
-            levels={levels}
+            levels={showDrawings ? levels : null}
             onPriceUpdate={setLivePrice}
           />
         </div>
 
-        <div className="w-full lg:w-80 shrink-0 lg:overflow-y-auto">
+        <div className="w-full lg:w-96 shrink-0 min-h-0 max-h-[70vh] lg:max-h-none self-stretch flex flex-col overflow-hidden">
           <VerdictCard
             pair={pair}
             interval={chartInterval}
             livePrice={livePrice}
-            onVerdictChange={(verdict) => setLevels(levelsFromVerdict(verdict))}
+            onAnalysisChange={(result) => setLevels(result.levels)}
           />
         </div>
       </div>

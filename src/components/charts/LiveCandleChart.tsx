@@ -19,10 +19,12 @@ import {
 } from "@/lib/tradingview";
 
 export interface ChartLevels {
-  entry: number;
-  stopLoss: number;
-  takeProfit1: number;
-  takeProfit2: number;
+  entry?: number;
+  stopLoss?: number;
+  takeProfit1?: number;
+  takeProfit2?: number;
+  supports?: number[];
+  resistances?: number[];
 }
 
 interface LiveCandleChartProps {
@@ -43,8 +45,8 @@ interface BinanceKlineMessage {
   };
 }
 
-const LEVEL_LINES: {
-  key: keyof ChartLevels;
+const TRADE_LINES: {
+  key: "entry" | "stopLoss" | "takeProfit1" | "takeProfit2";
   title: string;
   color: string;
   lineStyle: LineStyle;
@@ -75,16 +77,52 @@ function applyLevelLines(
   }
   if (!levels) return [];
 
-  return LEVEL_LINES.map((def) =>
-    series.createPriceLine({
-      price: levels[def.key],
-      color: def.color,
-      lineWidth: 1,
-      lineStyle: def.lineStyle,
-      axisLabelVisible: true,
-      title: def.title,
-    })
-  );
+  const lines: IPriceLine[] = [];
+
+  for (const def of TRADE_LINES) {
+    const price = levels[def.key];
+    if (price == null || !Number.isFinite(price)) continue;
+    lines.push(
+      series.createPriceLine({
+        price,
+        color: def.color,
+        lineWidth: 1,
+        lineStyle: def.lineStyle,
+        axisLabelVisible: true,
+        title: def.title,
+      })
+    );
+  }
+
+  (levels.supports ?? []).forEach((price, i) => {
+    if (!Number.isFinite(price)) return;
+    lines.push(
+      series.createPriceLine({
+        price,
+        color: "#2ee6a8",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: i === 0 ? "Support" : `S${i + 1}`,
+      })
+    );
+  });
+
+  (levels.resistances ?? []).forEach((price, i) => {
+    if (!Number.isFinite(price)) return;
+    lines.push(
+      series.createPriceLine({
+        price,
+        color: "#ff8a5c",
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: i === 0 ? "Resistance" : `R${i + 1}`,
+      })
+    );
+  });
+
+  return lines;
 }
 
 export function LiveCandleChart({
@@ -277,6 +315,16 @@ export function LiveCandleChart({
     };
   }, [pair, interval]);
 
+  const hasTrade =
+    levels &&
+    (levels.entry != null ||
+      levels.stopLoss != null ||
+      levels.takeProfit1 != null ||
+      levels.takeProfit2 != null);
+  const hasStructure =
+    levels &&
+    ((levels.supports?.length ?? 0) > 0 || (levels.resistances?.length ?? 0) > 0);
+
   return (
     <div className="relative h-full w-full">
       {loading && (
@@ -295,11 +343,21 @@ export function LiveCandleChart({
           Live
         </div>
       )}
-      {levels && !loading && !error && (
+      {(hasTrade || hasStructure) && !loading && !error && (
         <div className="absolute bottom-3 left-3 z-10 flex flex-wrap gap-2 text-[10px] font-mono-data bg-bg-card/90 px-2.5 py-1.5 rounded-lg border border-white/8">
-          <span className="text-accent">Entry</span>
-          <span className="text-bear">SL</span>
-          <span className="text-bull">TP1 / TP2</span>
+          {hasStructure && (
+            <>
+              <span className="text-bull">Support</span>
+              <span className="text-[#ff8a5c]">Resistance</span>
+            </>
+          )}
+          {hasTrade && (
+            <>
+              <span className="text-accent">Entry</span>
+              <span className="text-bear">SL</span>
+              <span className="text-bull">TP1 / TP2</span>
+            </>
+          )}
         </div>
       )}
       <div ref={containerRef} className="h-full w-full" />
