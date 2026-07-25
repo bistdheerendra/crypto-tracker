@@ -12,7 +12,7 @@ import type { ETFFlow, Liquidation, NewsItem, WhaleTransaction } from "@/lib/typ
 const TABS = ["Whales", "ETF Flows", "Liquidations", "Scenarios"] as const;
 
 export function RadarDrawer() {
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Whales");
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("ETF Flows");
   const whales = useRadarFeed<WhaleTransaction>("whales", 120_000);
   const etf = useRadarFeed<ETFFlow>("etf", 300_000);
   const liquidations = useRadarFeed<Liquidation>("liquidations", 30_000);
