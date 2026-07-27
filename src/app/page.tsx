@@ -14,16 +14,16 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main>
-      <nav className="fixed top-8 left-0 right-0 z-50 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-bg-primary/80 backdrop-blur-sm border-b border-white/8 lg:top-auto lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
+    <main className="relative w-full min-h-dvh overflow-x-hidden">
+      <nav className="fixed top-8 left-0 right-0 z-50 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-bg-primary/80 backdrop-blur-sm border-b border-white/8 lg:top-0 lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
         <BrandLogo href="/" size="md" />
-        <div className="flex items-center gap-2 sm:gap-4 text-sm">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4 text-sm">
           <Link href="/auth/login" className="text-text-muted hover:text-text-primary transition-colors px-2 py-1">
             Sign in
           </Link>
           <Link
             href="/auth/signup"
-            className="px-3 sm:px-4 py-2 bg-accent text-bg-primary rounded-lg font-semibold hover:bg-accent/90 transition-colors text-xs sm:text-sm"
+            className="px-3 sm:px-4 py-2 bg-accent text-bg-primary rounded-lg font-semibold hover:bg-accent/90 transition-colors text-xs sm:text-sm whitespace-nowrap"
           >
             Get started
           </Link>

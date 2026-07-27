@@ -138,6 +138,16 @@ async function predictOnnx(features: MlFeatureVector): Promise<MlEdge | null> {
   try {
     const inputName = session.inputNames[0] ?? "float_input";
     const floats = vectorToFloat32(features);
+    // Optional debug: log the exact ONNX input vector (order matters).
+    // Enable via `ML_EDGE_DEBUG=1` to avoid noisy logs in normal usage.
+    if (process.env.ML_EDGE_DEBUG === "1" && features.pair_ETH_USDT === 1) {
+      const cols = meta.feature_columns?.length ? meta.feature_columns : MODEL_FEATURE_COLUMNS;
+      const vec = cols.map((col, i) => ({
+        col,
+        value: floats[i]!,
+      }));
+      console.log("[ml][DEBUG] ONNX input vector (pair_ETH_USDT=1):", vec);
+    }
     const tensor = new Tensor("float32", floats, [1, floats.length]);
     const results = await session.run({ [inputName]: tensor });
     const tensors = session.outputNames.map((n) => results[n]!);

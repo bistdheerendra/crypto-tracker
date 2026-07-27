@@ -101,7 +101,13 @@ export function GlobeScene({ dots }: { dots: NewsItem[] }) {
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-    mount.appendChild(renderer.domElement);
+    // Pixel ratio keeps the buffer sharp; CSS must still match the mount size
+    // (retina buffers like 1152² otherwise overflow laptop layouts).
+    const canvas = renderer.domElement;
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    mount.appendChild(canvas);
 
     const globe = new THREE.Group();
     globe.rotation.set(THREE.MathUtils.degToRad(-8), THREE.MathUtils.degToRad(-22), 0);
@@ -166,7 +172,10 @@ export function GlobeScene({ dots }: { dots: NewsItem[] }) {
     const resize = () => {
       const { width, height } = mount.getBoundingClientRect();
       if (!width || !height) return;
-      renderer.setSize(width, height, false);
+      // Match CSS size to the mount (not the retina drawing buffer).
+      renderer.setSize(width, height, true);
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
@@ -222,5 +231,5 @@ export function GlobeScene({ dots }: { dots: NewsItem[] }) {
     };
   }, [dots]);
 
-  return <div ref={mountRef} className="h-full w-full" />;
+  return <div ref={mountRef} className="absolute inset-0 h-full w-full overflow-hidden" />;
 }

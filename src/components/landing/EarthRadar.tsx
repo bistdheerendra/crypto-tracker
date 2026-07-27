@@ -65,10 +65,10 @@ export function EarthRadar() {
           </GlassCard>
         )}
 
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           <ScrollReveal delay={0.1}>
             <div
-              className="relative mx-auto aspect-square w-full max-w-xl"
+              className="relative mx-auto w-full max-w-[min(100%,36rem,70vh)] aspect-square overflow-hidden"
               role="img"
               aria-label="Interactive live global crypto news map"
             >
