@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
 import { Loader2, Plus, Pencil, Trash2, X } from "lucide-react";
 import type { PaperWallet, PositionRow, SignalHint } from "@/lib/portfolio/types";
@@ -76,6 +77,11 @@ function formatUsd(n: number): string {
   });
 }
 
+function formatAmount(n: number): string {
+  if (n >= 1) return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return n.toLocaleString(undefined, { maximumSignificantDigits: 6 });
+}
+
 function openAmount(position: PositionRow): number {
   return Math.max(position.amount - position.closedAmount, 0);
 }
@@ -88,6 +94,20 @@ function unrealizedPnL(position: PositionRow, price: number): number {
   const qty = openAmount(position);
   const delta = price - position.avgEntryPrice;
   return position.positionType === "short" ? -delta * qty : delta * qty;
+}
+
+function StatusPill({ open }: { open: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono-data border ${
+        open
+          ? "border-bull/30 bg-bull/15 text-bull"
+          : "border-white/15 bg-white/5 text-text-muted"
+      }`}
+    >
+      {open ? "Open" : "Closed"}
+    </span>
+  );
 }
 
 export default function PortfolioPage() {
@@ -153,31 +173,41 @@ export default function PortfolioPage() {
       setQuotes({});
       return;
     }
+
     let cancelled = false;
-    Promise.all(
-      symbols.map((symbol) =>
-        fetch(`/api/market?symbol=${encodeURIComponent(symbol)}`)
-          .then((r) => r.json())
-          .then((d) =>
-            [
-              symbol,
-              {
-                price: typeof d.price === "number" ? d.price : null,
-                change24hPct:
-                  typeof d.change24hPct === "number" ? d.change24hPct : null,
-              } satisfies MarketQuote,
-            ] as const
-          )
-          .catch(
-            () =>
-              [symbol, { price: null, change24hPct: null } as MarketQuote] as const
-          )
-      )
-    ).then((rows) => {
+
+    async function fetchQuotes() {
+      const rows = await Promise.all(
+        symbols.map((symbol) =>
+          fetch(`/api/market?symbol=${encodeURIComponent(symbol)}`)
+            .then((r) => r.json())
+            .then((d) =>
+              [
+                symbol,
+                {
+                  price: typeof d.price === "number" ? d.price : null,
+                  change24hPct:
+                    typeof d.change24hPct === "number" ? d.change24hPct : null,
+                } satisfies MarketQuote,
+              ] as const
+            )
+            .catch(
+              () =>
+                [symbol, { price: null, change24hPct: null } as MarketQuote] as const
+            )
+        )
+      );
       if (!cancelled) setQuotes(Object.fromEntries(rows));
-    });
+    }
+
+    void fetchQuotes();
+    const interval = window.setInterval(() => {
+      void fetchQuotes();
+    }, 15_000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, [positions, modalOpen, editingId, form.assetSymbol]);
 
@@ -400,39 +430,199 @@ export default function PortfolioPage() {
       </div>
 
       <GlassCard className="!p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center gap-2 p-6 text-text-muted text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading positions…
+        {loading ? (
+          <div className="flex items-center gap-2 p-6 text-text-muted text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading positions…
+          </div>
+        ) : positions.length === 0 ? (
+          <p className="py-8 px-4 text-center text-text-muted text-sm">
+            No positions yet. Add one to start tracking.
+          </p>
+        ) : (
+          <>
+            {/* Mobile: card view */}
+            <div className="md:hidden divide-y divide-white/5">
+              {positions.map((p) => {
+                const open = isOpen(p);
+                const livePrice = quotes[p.assetSymbol]?.price ?? null;
+                const changePct = quotes[p.assetSymbol]?.change24hPct ?? null;
+                const openQty = openAmount(p);
+                const price = open ? livePrice : p.exitPrice;
+                const value = open && price != null ? openQty * price : null;
+                const pnl = open
+                  ? price != null
+                    ? unrealizedPnL(p, price)
+                    : null
+                  : p.realizedPnl;
+                const align = alignmentFor(p.positionType, signals[p.assetSymbol]);
+                return (
+                  <div key={p.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <CoinIcon
+                          symbol={pairBaseSymbol(p.assetSymbol)}
+                          size={36}
+                          className="ring-1 ring-white/10"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-mono-data font-semibold truncate">
+                            {p.assetSymbol}
+                          </p>
+                          <p className="text-xs text-text-muted capitalize">
+                            {p.positionType}
+                            {p.leverage != null ? ` · ${p.leverage}x` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <StatusPill open={open} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Live price
+                        </p>
+                        <p className="font-mono-data">
+                          {price != null ? formatUsd(price) : "—"}
+                          {open && changePct != null && (
+                            <span
+                              className={`ml-1.5 text-xs ${
+                                changePct >= 0 ? "text-bull" : "text-bear"
+                              }`}
+                            >
+                              {changePct >= 0 ? "+" : ""}
+                              {changePct.toFixed(2)}%
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Entry
+                        </p>
+                        <p className="font-mono-data">{formatUsd(p.avgEntryPrice)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Amount
+                        </p>
+                        <p className="font-mono-data">{formatAmount(open ? openQty : p.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Value
+                        </p>
+                        <p className="font-mono-data">
+                          {value != null ? formatUsd(value) : open ? "—" : "Closed"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Stop loss
+                        </p>
+                        <p className="font-mono-data">
+                          {p.stopLoss != null ? formatUsd(p.stopLoss) : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Take profit
+                        </p>
+                        <p className="font-mono-data">
+                          {p.takeProfit != null ? formatUsd(p.takeProfit) : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          P&amp;L
+                        </p>
+                        <p
+                          className={`font-mono-data font-semibold ${
+                            pnl == null
+                              ? "text-text-muted"
+                              : pnl >= 0
+                                ? "text-bull"
+                                : "text-bear"
+                          }`}
+                        >
+                          {pnl == null
+                            ? "—"
+                            : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-text-muted">
+                          Signal
+                        </p>
+                        <div className="mt-0.5">
+                          {open ? (
+                            <AlignmentPill kind={align} />
+                          ) : (
+                            <span className="text-xs text-text-muted font-mono-data">
+                              Closed
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {open && (
+                        <button
+                          type="button"
+                          onClick={() => setCloseTarget(p)}
+                          className="flex-1 min-h-11 inline-flex items-center justify-center px-3 rounded-lg text-sm text-mixed border border-mixed/30 bg-mixed/10 hover:bg-mixed/20"
+                        >
+                          Close
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => openEdit(p)}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-white/5 border border-white/10"
+                        aria-label="Edit position"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removePosition(p.id)}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-bear hover:bg-bear/5 border border-white/10"
+                        aria-label="Delete position"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <table className="w-full text-sm min-w-[760px]">
-              <thead>
-                <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
-                  <th className="text-left py-3 px-4">Asset</th>
-                  <th className="text-left py-3 px-4">Type</th>
-                  <th className="text-right py-3 px-4">Amount</th>
-                  <th className="text-right py-3 px-4">Entry</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-right py-3 px-4">Price</th>
-                  <th className="text-right py-3 px-4">Value</th>
-                  <th className="text-right py-3 px-4">P&L</th>
-                  <th className="text-left py-3 px-4">Signal</th>
-                  <th className="text-right py-3 px-4"> </th>
-                </tr>
-              </thead>
-              <tbody>
-                {positions.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-8 px-4 text-center text-text-muted">
-                      No positions yet. Add one to start tracking.
-                    </td>
+
+            {/* Desktop: table view */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm min-w-[980px]">
+                <thead>
+                  <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
+                    <th className="text-left py-3 px-4">Asset</th>
+                    <th className="text-left py-3 px-4">Type</th>
+                    <th className="text-right py-3 px-4">Amount</th>
+                    <th className="text-right py-3 px-4">Entry</th>
+                    <th className="text-right py-3 px-4">Live price</th>
+                    <th className="text-right py-3 px-4">SL</th>
+                    <th className="text-right py-3 px-4">TP</th>
+                    <th className="text-left py-3 px-4">Status</th>
+                    <th className="text-right py-3 px-4">Value</th>
+                    <th className="text-right py-3 px-4">P&amp;L</th>
+                    <th className="text-left py-3 px-4">Signal</th>
+                    <th className="text-right py-3 px-4"> </th>
                   </tr>
-                ) : (
-                  positions.map((p) => {
+                </thead>
+                <tbody>
+                  {positions.map((p) => {
                     const open = isOpen(p);
                     const livePrice = quotes[p.assetSymbol]?.price ?? null;
+                    const changePct = quotes[p.assetSymbol]?.change24hPct ?? null;
                     const openQty = openAmount(p);
                     const price = open ? livePrice : p.exitPrice;
                     const value = open && price != null ? openQty * price : null;
@@ -444,8 +634,17 @@ export default function PortfolioPage() {
                     const align = alignmentFor(p.positionType, signals[p.assetSymbol]);
                     return (
                       <tr key={p.id} className="border-t border-white/5 hover:bg-white/3">
-                        <td className="py-3 px-4 font-mono-data font-semibold">
-                          {p.assetSymbol}
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <CoinIcon
+                              symbol={pairBaseSymbol(p.assetSymbol)}
+                              size={28}
+                              className="ring-1 ring-white/10"
+                            />
+                            <span className="font-mono-data font-semibold">
+                              {p.assetSymbol}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 px-4 capitalize text-text-muted">
                           {p.positionType}
@@ -456,24 +655,34 @@ export default function PortfolioPage() {
                           ) : null}
                         </td>
                         <td className="py-3 px-4 font-mono-data text-right">
-                          {p.amount}
+                          {formatAmount(open ? openQty : p.amount)}
                         </td>
                         <td className="py-3 px-4 font-mono-data text-right">
                           {formatUsd(p.avgEntryPrice)}
                         </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono-data border ${
-                              open
-                                ? "border-bull/30 bg-bull/15 text-bull"
-                                : "border-white/15 bg-white/5 text-text-muted"
-                            }`}
-                          >
-                            {open ? "Open" : "Closed"}
-                          </span>
-                        </td>
                         <td className="py-3 px-4 font-mono-data text-right">
-                          {price != null ? formatUsd(price) : "—"}
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span>{price != null ? formatUsd(price) : "—"}</span>
+                            {open && changePct != null && (
+                              <span
+                                className={`text-[10px] ${
+                                  changePct >= 0 ? "text-bull" : "text-bear"
+                                }`}
+                              >
+                                {changePct >= 0 ? "+" : ""}
+                                {changePct.toFixed(2)}% 24h
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono-data text-right text-text-muted">
+                          {p.stopLoss != null ? formatUsd(p.stopLoss) : "—"}
+                        </td>
+                        <td className="py-3 px-4 font-mono-data text-right text-text-muted">
+                          {p.takeProfit != null ? formatUsd(p.takeProfit) : "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <StatusPill open={open} />
                         </td>
                         <td className="py-3 px-4 font-mono-data text-right">
                           {value != null ? formatUsd(value) : open ? "—" : "Closed"}
@@ -533,12 +742,12 @@ export default function PortfolioPage() {
                         </td>
                       </tr>
                     );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </GlassCard>
 
       {modalOpen && (
