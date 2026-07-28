@@ -5,8 +5,10 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
+import { RegimeBadge } from "@/components/ui/RegimeBadge";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
+import { useMarketRegime } from "@/components/regime/useMarketRegime";
 import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
@@ -31,6 +33,7 @@ export default function AnalyzePage() {
   const [mlEdge, setMlEdge] = useState<MlEdgePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { regime } = useMarketRegime(pair, timeframe, 150_000);
 
   async function runAnalysis() {
     setLoading(true);
@@ -171,6 +174,9 @@ export default function AnalyzePage() {
               </span>
             )}
             {mlEdge != null && <MlEdgeBadge winProbability={mlEdge.winProbability} />}
+            {regime && (
+              <RegimeBadge regime={regime.regime} direction={regime.direction} />
+            )}
             <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">

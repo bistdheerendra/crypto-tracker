@@ -26,7 +26,7 @@ function outcomeLabel(outcome: string | null | undefined): {
   if (outcome === "sl_hit") {
     return { text: "SL", className: "text-bear border-bear/30 bg-bear/10" };
   }
-  return { text: outcome, className: "text-text-muted border-white/10 bg-white/5" };
+  return { text: outcome ?? "—", className: "text-text-muted border-white/10 bg-white/5" };
 }
 
 function formatTakenAt(iso: string): string {

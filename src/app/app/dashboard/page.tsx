@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { TierPill } from "@/components/ui/TierPill";
+import { RegimeBadge } from "@/components/ui/RegimeBadge";
 import { useRadarFeed } from "@/components/radar/useRadarFeed";
+import { useMarketRegimes } from "@/components/regime/useMarketRegime";
 import { NewsFeedList } from "@/components/radar/NewsFeedList";
 import { EventsFeedList } from "@/components/radar/EventsFeedList";
 import type { CalendarEvent, NewsItem, Verdict } from "@/lib/types";
@@ -16,6 +18,7 @@ export default function DashboardPage() {
   const [prices, setPrices] = useState<Record<string, number | null>>({});
   const [timeframe, setTimeframe] = useState<string>("1h");
   const [loadingVerdicts, setLoadingVerdicts] = useState(true);
+  const { regimes } = useMarketRegimes(DASHBOARD_PAIRS, timeframe, 150_000);
   const {
     data: news,
     loading: loadingNews,
@@ -63,11 +66,18 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {DASHBOARD_PAIRS.map((pair) => (
+        {DASHBOARD_PAIRS.map((pair) => {
+          const regime = regimes[pair];
+          return (
           <GlassCard key={pair}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs text-text-muted uppercase tracking-wider mb-2">{pair}</p>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <p className="text-xs text-text-muted uppercase tracking-wider">{pair}</p>
+                  {regime && (
+                    <RegimeBadge regime={regime.regime} direction={regime.direction} />
+                  )}
+                </div>
                 <p className="font-mono-data text-2xl sm:text-3xl font-bold">
                   {prices[pair] != null
                     ? `$${prices[pair]!.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
@@ -77,7 +87,8 @@ export default function DashboardPage() {
               <CoinIcon symbol={pairBaseSymbol(pair)} size={40} className="ring-1 ring-white/10" />
             </div>
           </GlassCard>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
@@ -110,7 +121,9 @@ export default function DashboardPage() {
               ))}
             </>
           )}
-          {!loadingVerdicts && verdicts.map((v) => (
+          {!loadingVerdicts && verdicts.map((v) => {
+            const regime = regimes[v.pair];
+            return (
             <GlassCard key={v.pair} className="mb-3" glow="accent">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                 <span className="font-mono-data font-semibold text-sm sm:text-base">{v.pair} · {v.timeframe}</span>
@@ -118,6 +131,9 @@ export default function DashboardPage() {
                 <span className={`font-mono-data text-sm font-bold ${v.direction === "LONG" ? "text-bull" : v.direction === "SHORT" ? "text-bear" : "text-mixed"}`}>
                   {v.direction}
                 </span>
+                {regime && (
+                  <RegimeBadge regime={regime.regime} direction={regime.direction} />
+                )}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono-data">
                 <div><span className="text-text-muted">Entry </span><span className="text-bull">${v.entry.toFixed(0)}</span></div>
@@ -126,7 +142,8 @@ export default function DashboardPage() {
                 <div><span className="text-text-muted">R:R </span><span className="text-accent">{v.riskReward}</span></div>
               </div>
             </GlassCard>
-          ))}
+            );
+          })}
           {!loadingVerdicts && verdicts.length === 0 && (
             <>
               {DASHBOARD_PAIRS.map((pair) => (

@@ -5,7 +5,9 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
+import { RegimeBadge } from "@/components/ui/RegimeBadge";
 import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
+import { useMarketRegime } from "@/components/regime/useMarketRegime";
 import { intervalToApiTimeframe } from "@/lib/tradingview";
 import type { LaneOutput, Verdict } from "@/lib/types";
 import type { ChartLevels } from "@/components/charts/LiveCandleChart";
@@ -85,6 +87,8 @@ export function VerdictCard({
   const prevPriceRef = useRef<number | null>(null);
   const onAnalysisChangeRef = useRef(onAnalysisChange);
   const requestIdRef = useRef(0);
+  const apiTimeframe = intervalToApiTimeframe(interval);
+  const { regime } = useMarketRegime(pair, apiTimeframe, 150_000);
 
   useEffect(() => {
     onAnalysisChangeRef.current = onAnalysisChange;
@@ -276,6 +280,9 @@ export function VerdictCard({
                 </span>
               )}
               {mlEdge != null && <MlEdgeBadge winProbability={mlEdge.winProbability} />}
+              {regime && (
+                <RegimeBadge regime={regime.regime} direction={regime.direction} />
+              )}
             </div>
             <p className="text-xs text-text-muted mb-3">{verdict.alignment}</p>
 
