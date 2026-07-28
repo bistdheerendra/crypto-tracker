@@ -1,7 +1,14 @@
 import type { Bias, Direction, LaneOutput, Tier } from "../types";
 import type { VerdictFeaturePayload } from "./features";
 
-export type VerdictOutcome = "tp1_hit" | "tp2_hit" | "sl_hit" | "expired" | "open";
+export type VerdictOutcome =
+  | "tp1_hit"
+  | "tp2_hit"
+  | "sl_hit"
+  | "expired"
+  | "open"
+  /** Personal journal close — not written by the SL/TP resolver cron. */
+  | "manual_exit";
 
 export interface LaneBiases {
   technical: Bias;

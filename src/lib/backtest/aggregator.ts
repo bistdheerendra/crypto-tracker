@@ -14,13 +14,16 @@ export interface TrackRecordStats {
   computedAt: string;
 }
 
-function isWin(outcome: StoredVerdict["outcome"]): boolean {
-  return outcome === "tp1_hit" || outcome === "tp2_hit";
+function isWin(outcome: StoredVerdict["outcome"], rMultiple: number | null): boolean {
+  if (outcome === "tp1_hit" || outcome === "tp2_hit") return true;
+  // Manual exits book discretionary PnL — count as a win when R > 0.
+  if (outcome === "manual_exit" && rMultiple != null && rMultiple > 0) return true;
+  return false;
 }
 
 function winningDirection(v: StoredVerdict): "LONG" | "SHORT" | null {
   if (!v.outcome || v.outcome === "open") return null;
-  if (isWin(v.outcome)) return v.direction === "LONG" || v.direction === "SHORT" ? v.direction : null;
+  if (isWin(v.outcome, v.rMultiple)) return v.direction === "LONG" || v.direction === "SHORT" ? v.direction : null;
   if (v.outcome === "sl_hit") {
     return v.direction === "LONG" ? "SHORT" : v.direction === "SHORT" ? "LONG" : null;
   }
@@ -41,7 +44,7 @@ export function computeTrackRecord(verdicts: StoredVerdict[]): TrackRecordStats 
     (v) => v.outcome && v.outcome !== "open" && v.rMultiple !== null
   );
 
-  const wins = resolved.filter((v) => isWin(v.outcome));
+  const wins = resolved.filter((v) => isWin(v.outcome, v.rMultiple));
   const winRate = resolved.length > 0 ? (wins.length / resolved.length) * 100 : 0;
   const avgRMultiple =
     resolved.length > 0
@@ -52,7 +55,7 @@ export function computeTrackRecord(verdicts: StoredVerdict[]): TrackRecordStats 
   const tierWinRates = Object.fromEntries(
     tiers.map((tier) => {
       const tierResolved = resolved.filter((v) => v.confidenceTier === tier);
-      const tierWins = tierResolved.filter((v) => isWin(v.outcome));
+      const tierWins = tierResolved.filter((v) => isWin(v.outcome, v.rMultiple));
       return [
         tier,
         {

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { PwaRegister } from "@/components/pwa/PwaRegister";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -15,11 +16,22 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Dheerendra Intelligence",
   description: "See the cause behind every market move. Four independent analysis lanes. One synthesized verdict.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "DeepCurrent",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#03060f",
 };
 
 export default function RootLayout({
@@ -29,7 +41,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrains.variable} h-full antialiased`}>
-      <body className="min-h-full bg-bg-primary text-text-primary">{children}</body>
+      <body className="min-h-full bg-bg-primary text-text-primary">
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
 import { Loader2, Plus, Pencil, Trash2, X } from "lucide-react";
-import type { PositionRow, SignalHint } from "@/lib/portfolio/types";
+import type { PaperWallet, PositionRow, SignalHint } from "@/lib/portfolio/types";
 
 type PositionForm = {
   assetSymbol: string;
-  amount: string;
-  avgEntryPrice: string;
+  usdAmount: string;
+  amount: string; // edit-only
+  avgEntryPrice: string; // edit-only
+  stopLoss: string;
+  takeProfit: string;
   positionType: "spot" | "long" | "short";
   leverage: string;
   entryDate: string;
@@ -17,8 +20,11 @@ type PositionForm = {
 
 const EMPTY_FORM: PositionForm = {
   assetSymbol: TRACKED_PAIRS[0],
+  usdAmount: "",
   amount: "",
   avgEntryPrice: "",
+  stopLoss: "",
+  takeProfit: "",
   positionType: "spot",
   leverage: "",
   entryDate: "",
@@ -70,21 +76,24 @@ function formatUsd(n: number): string {
   });
 }
 
-function unrealizedPnL(
-  position: PositionRow,
-  price: number
-): number {
-  const lev = position.leverage && position.leverage > 0 ? position.leverage : 1;
+function openAmount(position: PositionRow): number {
+  return Math.max(position.amount - position.closedAmount, 0);
+}
+
+function isOpen(position: PositionRow): boolean {
+  return position.status !== "closed" && openAmount(position) > 0;
+}
+
+function unrealizedPnL(position: PositionRow, price: number): number {
+  const qty = openAmount(position);
   const delta = price - position.avgEntryPrice;
-  if (position.positionType === "short") {
-    return -delta * position.amount * lev;
-  }
-  return delta * position.amount * lev;
+  return position.positionType === "short" ? -delta * qty : delta * qty;
 }
 
 export default function PortfolioPage() {
   const [positions, setPositions] = useState<PositionRow[]>([]);
   const [signals, setSignals] = useState<Record<string, SignalHint>>({});
+  const [wallet, setWallet] = useState<PaperWallet | null>(null);
   const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +101,10 @@ export default function PortfolioPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PositionForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [closeTarget, setCloseTarget] = useState<PositionRow | null>(null);
+  const [closePercent, setClosePercent] = useState("100");
+  const [closeQty, setCloseQty] = useState("");
+  const [closing, setClosing] = useState(false);
 
   const loadPositions = useCallback(async () => {
     setLoading(true);
@@ -103,6 +116,7 @@ export default function PortfolioPage() {
         error?: string;
         positions?: PositionRow[];
         signals?: Record<string, SignalHint>;
+        wallet?: PaperWallet;
       } = {};
       try {
         data = text ? JSON.parse(text) : {};
@@ -116,6 +130,7 @@ export default function PortfolioPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed to load portfolio");
       setPositions(data.positions ?? []);
       setSignals(data.signals ?? {});
+      setWallet(data.wallet ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
     } finally {
@@ -128,7 +143,12 @@ export default function PortfolioPage() {
   }, [loadPositions]);
 
   useEffect(() => {
-    const symbols = [...new Set(positions.map((p) => p.assetSymbol))];
+    const symbols = [
+      ...new Set([
+        ...positions.map((p) => p.assetSymbol),
+        ...(modalOpen && !editingId ? [form.assetSymbol] : []),
+      ]),
+    ];
     if (symbols.length === 0) {
       setQuotes({});
       return;
@@ -159,50 +179,36 @@ export default function PortfolioPage() {
     return () => {
       cancelled = true;
     };
-  }, [positions]);
+  }, [positions, modalOpen, editingId, form.assetSymbol]);
+
+  const previewPrice = quotes[form.assetSymbol]?.price ?? null;
+  const previewQty =
+    previewPrice != null && Number(form.usdAmount) > 0
+      ? Number(form.usdAmount) / previewPrice
+      : null;
 
   const summary = (() => {
-    let totalValue = 0;
-    let change24hUsd = 0;
-    let alignedValue = 0;
-    let conflictingValue = 0;
-    let bullAlignedValue = 0;
-    let bearAlignedValue = 0;
-
+    let openPositionsValue = 0;
+    let realizedPnl = 0;
     for (const p of positions) {
+      realizedPnl += p.realizedPnl;
+      if (!isOpen(p)) continue;
       const price = quotes[p.assetSymbol]?.price;
-      const changePct = quotes[p.assetSymbol]?.change24hPct;
       if (price == null) continue;
-      const value = p.amount * price;
-      totalValue += value;
-
-      if (changePct != null) {
-        const sign = p.positionType === "short" ? -1 : 1;
-        change24hUsd += value * (changePct / 100) * sign;
-      }
-
-      const align = alignmentFor(p.positionType, signals[p.assetSymbol]);
-      if (align === "aligned") {
-        alignedValue += value;
-        if (p.positionType === "short") bearAlignedValue += value;
-        else bullAlignedValue += value;
-      } else if (align === "conflicting") {
-        conflictingValue += value;
-      }
+      openPositionsValue += openAmount(p) * price;
     }
-
-    const alignedPct = totalValue > 0 ? (alignedValue / totalValue) * 100 : 0;
-    const bullPct = totalValue > 0 ? (bullAlignedValue / totalValue) * 100 : 0;
-    const bearPct = totalValue > 0 ? (bearAlignedValue / totalValue) * 100 : 0;
-
+    const starting = wallet?.startingBalance ?? 1000;
+    const cashBalance = wallet?.cashBalance ?? 0;
+    const totalPortfolioValue = cashBalance + openPositionsValue;
+    const totalPnl = totalPortfolioValue - starting;
+    const totalPnlPct = starting > 0 ? (totalPnl / starting) * 100 : 0;
     return {
-      totalValue,
-      change24hUsd,
-      change24hPct: totalValue > 0 ? (change24hUsd / totalValue) * 100 : 0,
-      alignedPct,
-      conflictingPct: totalValue > 0 ? (conflictingValue / totalValue) * 100 : 0,
-      bullPct,
-      bearPct,
+      cashBalance,
+      openPositionsValue,
+      totalPortfolioValue,
+      totalPnl,
+      totalPnlPct,
+      realizedPnl,
     };
   })();
 
@@ -217,7 +223,10 @@ export default function PortfolioPage() {
     setForm({
       assetSymbol: p.assetSymbol,
       amount: String(p.amount),
+      usdAmount: "",
       avgEntryPrice: String(p.avgEntryPrice),
+      stopLoss: p.stopLoss != null ? String(p.stopLoss) : "",
+      takeProfit: p.takeProfit != null ? String(p.takeProfit) : "",
       positionType: p.positionType as PositionForm["positionType"],
       leverage: p.leverage != null ? String(p.leverage) : "",
       entryDate: p.entryDate ? p.entryDate.slice(0, 10) : "",
@@ -233,8 +242,16 @@ export default function PortfolioPage() {
       const payload = {
         ...(editingId ? { id: editingId } : {}),
         assetSymbol: form.assetSymbol,
-        amount: Number(form.amount),
-        avgEntryPrice: Number(form.avgEntryPrice),
+        ...(editingId
+          ? {
+              amount: Number(form.amount),
+              avgEntryPrice: Number(form.avgEntryPrice),
+            }
+          : {
+              usdAmount: Number(form.usdAmount),
+            }),
+        stopLoss: form.stopLoss === "" ? null : Number(form.stopLoss),
+        takeProfit: form.takeProfit === "" ? null : Number(form.takeProfit),
         positionType: form.positionType,
         leverage: form.leverage === "" ? null : Number(form.leverage),
         entryDate: form.entryDate === "" ? null : form.entryDate,
@@ -270,13 +287,42 @@ export default function PortfolioPage() {
     }
   }
 
+  async function submitClose() {
+    if (!closeTarget) return;
+    const openQty = openAmount(closeTarget);
+    if (openQty <= 0) return;
+    setClosing(true);
+    setError(null);
+    try {
+      const body =
+        closeQty.trim() !== ""
+          ? { closeQty: Number(closeQty) }
+          : { closePercent: Number(closePercent) };
+      const res = await fetch(`/api/portfolio/${encodeURIComponent(closeTarget.id)}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Close failed");
+      setCloseTarget(null);
+      setClosePercent("100");
+      setCloseQty("");
+      await loadPositions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Close failed");
+    } finally {
+      setClosing(false);
+    }
+  }
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 2xl:px-10">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold mb-1">Portfolio</h1>
           <p className="text-text-muted text-sm">
-            Track holdings alongside DeepCurrent signal alignment.
+            Paper trading account with virtual cash + live mark-to-market.
           </p>
         </div>
         <button
@@ -295,55 +341,61 @@ export default function PortfolioPage() {
         </GlassCard>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">
-            Total value
+            Cash balance
           </p>
           <p className="font-mono-data text-2xl sm:text-3xl font-bold">
-            {loading ? "—" : formatUsd(summary.totalValue)}
+            {loading ? "—" : formatUsd(summary.cashBalance)}
           </p>
         </GlassCard>
         <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">
-            24h change
+            Open positions value
           </p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold">
+            {loading ? "—" : formatUsd(summary.openPositionsValue)}
+          </p>
+        </GlassCard>
+        <GlassCard>
+          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">
+            Total portfolio value
+          </p>
+          <p className="font-mono-data text-2xl sm:text-3xl font-bold">
+            {loading ? "—" : formatUsd(summary.totalPortfolioValue)}
+          </p>
+        </GlassCard>
+        <GlassCard glow="accent">
+          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Total P&amp;L</p>
           <p
             className={`font-mono-data text-2xl sm:text-3xl font-bold ${
-              summary.change24hUsd >= 0 ? "text-bull" : "text-bear"
+              summary.totalPnl >= 0 ? "text-bull" : "text-bear"
             }`}
           >
             {loading
               ? "—"
-              : `${summary.change24hUsd >= 0 ? "+" : ""}${formatUsd(summary.change24hUsd)}`}
+              : `${summary.totalPnl >= 0 ? "+" : ""}${formatUsd(summary.totalPnl)}`}
           </p>
           <p
             className={`font-mono-data text-xs mt-1 ${
-              summary.change24hPct >= 0 ? "text-bull" : "text-bear"
+              summary.totalPnlPct >= 0 ? "text-bull" : "text-bear"
+            }`}
+          >
+            {loading ? "" : `${summary.totalPnlPct >= 0 ? "+" : ""}${summary.totalPnlPct.toFixed(2)}%`}
+          </p>
+        </GlassCard>
+        <GlassCard>
+          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Realized P&amp;L</p>
+          <p
+            className={`font-mono-data text-2xl sm:text-3xl font-bold ${
+              summary.realizedPnl >= 0 ? "text-bull" : "text-bear"
             }`}
           >
             {loading
-              ? ""
-              : `${summary.change24hPct >= 0 ? "+" : ""}${summary.change24hPct.toFixed(2)}%`}
+              ? "—"
+              : `${summary.realizedPnl >= 0 ? "+" : ""}${formatUsd(summary.realizedPnl)}`}
           </p>
-        </GlassCard>
-        <GlassCard glow="accent">
-          <p className="text-xs text-text-muted uppercase tracking-wider mb-2">
-            Signal alignment
-          </p>
-          <p className="text-sm text-text-muted mb-2">
-            Portfolio value aligned with current signals
-          </p>
-          <p className="font-mono-data text-xl font-bold text-accent">
-            {loading ? "—" : `${summary.alignedPct.toFixed(0)}% aligned`}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3 text-xs font-mono-data">
-            <span className="text-bull">Bullish {summary.bullPct.toFixed(0)}%</span>
-            <span className="text-bear">Bearish {summary.bearPct.toFixed(0)}%</span>
-            <span className="text-text-muted">
-              Conflict {summary.conflictingPct.toFixed(0)}%
-            </span>
-          </div>
         </GlassCard>
       </div>
 
@@ -355,16 +407,17 @@ export default function PortfolioPage() {
               Loading positions…
             </div>
           ) : (
-            <table className="w-full text-sm min-w-[880px]">
+            <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                   <th className="text-left py-3 px-4">Asset</th>
                   <th className="text-left py-3 px-4">Type</th>
                   <th className="text-right py-3 px-4">Amount</th>
                   <th className="text-right py-3 px-4">Entry</th>
+                  <th className="text-left py-3 px-4">Status</th>
                   <th className="text-right py-3 px-4">Price</th>
                   <th className="text-right py-3 px-4">Value</th>
-                  <th className="text-right py-3 px-4">Unrealized</th>
+                  <th className="text-right py-3 px-4">P&L</th>
                   <th className="text-left py-3 px-4">Signal</th>
                   <th className="text-right py-3 px-4"> </th>
                 </tr>
@@ -372,15 +425,22 @@ export default function PortfolioPage() {
               <tbody>
                 {positions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 px-4 text-center text-text-muted">
+                    <td colSpan={10} className="py-8 px-4 text-center text-text-muted">
                       No positions yet. Add one to start tracking.
                     </td>
                   </tr>
                 ) : (
                   positions.map((p) => {
-                    const price = quotes[p.assetSymbol]?.price ?? null;
-                    const value = price != null ? p.amount * price : null;
-                    const pnl = price != null ? unrealizedPnL(p, price) : null;
+                    const open = isOpen(p);
+                    const livePrice = quotes[p.assetSymbol]?.price ?? null;
+                    const openQty = openAmount(p);
+                    const price = open ? livePrice : p.exitPrice;
+                    const value = open && price != null ? openQty * price : null;
+                    const pnl = open
+                      ? price != null
+                        ? unrealizedPnL(p, price)
+                        : null
+                      : p.realizedPnl;
                     const align = alignmentFor(p.positionType, signals[p.assetSymbol]);
                     return (
                       <tr key={p.id} className="border-t border-white/5 hover:bg-white/3">
@@ -401,11 +461,22 @@ export default function PortfolioPage() {
                         <td className="py-3 px-4 font-mono-data text-right">
                           {formatUsd(p.avgEntryPrice)}
                         </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono-data border ${
+                              open
+                                ? "border-bull/30 bg-bull/15 text-bull"
+                                : "border-white/15 bg-white/5 text-text-muted"
+                            }`}
+                          >
+                            {open ? "Open" : "Closed"}
+                          </span>
+                        </td>
                         <td className="py-3 px-4 font-mono-data text-right">
                           {price != null ? formatUsd(price) : "—"}
                         </td>
                         <td className="py-3 px-4 font-mono-data text-right">
-                          {value != null ? formatUsd(value) : "—"}
+                          {value != null ? formatUsd(value) : open ? "—" : "Closed"}
                         </td>
                         <td
                           className={`py-3 px-4 font-mono-data text-right font-semibold ${
@@ -421,14 +492,31 @@ export default function PortfolioPage() {
                             : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`}
                         </td>
                         <td className="py-3 px-4">
-                          <AlignmentPill kind={align} />
+                          {open ? (
+                            <AlignmentPill kind={align} />
+                          ) : (
+                            <span className="text-xs text-text-muted font-mono-data">
+                              Closed
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="inline-flex gap-1">
+                          <div className="inline-flex gap-1.5">
+                            {open && (
+                              <button
+                                type="button"
+                                onClick={() => setCloseTarget(p)}
+                                className="inline-flex min-h-11 items-center px-3 rounded-lg text-text-muted hover:text-mixed hover:bg-mixed/10 disabled:opacity-50"
+                                aria-label="Close position"
+                                title="Close position"
+                              >
+                                Close
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => openEdit(p)}
-                              className="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-white/5"
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-white/5"
                               aria-label="Edit position"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -436,7 +524,7 @@ export default function PortfolioPage() {
                             <button
                               type="button"
                               onClick={() => void removePosition(p.id)}
-                              className="p-2 rounded-lg text-text-muted hover:text-bear hover:bg-bear/5"
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-bear hover:bg-bear/5"
                               aria-label="Delete position"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -461,7 +549,7 @@ export default function PortfolioPage() {
             onClick={() => setModalOpen(false)}
             aria-label="Close modal"
           />
-          <div className="relative w-full sm:max-w-md bg-[#0d1224] border border-white/10 rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl">
+          <div className="relative w-full sm:max-w-md max-h-[92dvh] overflow-y-auto bg-[#0d1224] border border-white/10 rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">
                 {editingId ? "Edit position" : "Add position"}
@@ -495,37 +583,84 @@ export default function PortfolioPage() {
                   ))}
                 </select>
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="text-text-muted text-xs uppercase tracking-wider">
-                    Amount
+                    USD to spend
                   </span>
                   <input
                     type="number"
                     step="any"
                     min="0"
-                    value={form.amount}
+                    value={editingId ? form.amount : form.usdAmount}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, amount: e.target.value }))
+                      setForm((f) =>
+                        editingId
+                          ? { ...f, amount: e.target.value }
+                          : { ...f, usdAmount: e.target.value }
+                      )
                     }
                     className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono-data"
                     required
                   />
                 </label>
+                {editingId && (
+                  <label className="block text-sm">
+                    <span className="text-text-muted text-xs uppercase tracking-wider">
+                      Avg entry
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={form.avgEntryPrice}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, avgEntryPrice: e.target.value }))
+                      }
+                      className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono-data"
+                      required
+                    />
+                  </label>
+                )}
+              </div>
+              {!editingId && (
+                <p className="text-xs text-text-muted font-mono-data">
+                  {previewPrice != null && previewQty != null
+                    ? `≈ ${previewQty.toFixed(8)} ${form.assetSymbol.split("/")[0]} at current price ${formatUsd(previewPrice)}`
+                    : "Live quantity preview appears when market price and USD amount are available."}
+                </p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="text-text-muted text-xs uppercase tracking-wider">
-                    Avg entry
+                    Stop Loss (optional)
                   </span>
                   <input
                     type="number"
                     step="any"
                     min="0"
-                    value={form.avgEntryPrice}
+                    value={form.stopLoss}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, avgEntryPrice: e.target.value }))
+                      setForm((f) => ({ ...f, stopLoss: e.target.value }))
                     }
                     className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono-data"
-                    required
+                    placeholder="e.g. 62000"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-text-muted text-xs uppercase tracking-wider">
+                    Take Profit (optional)
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={form.takeProfit}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, takeProfit: e.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono-data"
+                    placeholder="e.g. 70000"
                   />
                 </label>
               </div>
@@ -548,7 +683,7 @@ export default function PortfolioPage() {
                   <option value="short">Short</option>
                 </select>
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block text-sm">
                   <span className="text-text-muted text-xs uppercase tracking-wider">
                     Leverage (optional)
@@ -588,6 +723,76 @@ export default function PortfolioPage() {
                 {editingId ? "Save changes" : "Add position"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {closeTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setCloseTarget(null)}
+            aria-label="Close modal"
+          />
+          <div className="relative w-full sm:max-w-md max-h-[92dvh] overflow-y-auto bg-[#0d1224] border border-white/10 rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Close position</h2>
+              <button
+                type="button"
+                onClick={() => setCloseTarget(null)}
+                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              {closeTarget.assetSymbol} open amount:{" "}
+              <span className="font-mono-data">{openAmount(closeTarget).toFixed(8)}</span>
+            </p>
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {["25", "50", "75", "100"].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => {
+                    setClosePercent(pct);
+                    setCloseQty("");
+                  }}
+                  className={`min-h-11 px-2 py-2 rounded-lg text-xs border ${
+                    closePercent === pct && closeQty === ""
+                      ? "bg-accent/20 border-accent/40 text-accent"
+                      : "bg-white/5 border-white/10 text-text-muted"
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+            <label className="block text-sm mb-4">
+              <span className="text-text-muted text-xs uppercase tracking-wider">
+                Custom close amount (optional)
+              </span>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={closeQty}
+                onChange={(e) => setCloseQty(e.target.value)}
+                className="mt-1 w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm font-mono-data"
+                placeholder="Leave blank to use selected %"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => void submitClose()}
+              disabled={closing}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-50 transition-colors"
+            >
+              {closing && <Loader2 className="w-4 h-4 animate-spin" />}
+              Confirm close
+            </button>
           </div>
         </div>
       )}

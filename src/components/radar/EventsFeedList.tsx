@@ -17,7 +17,7 @@ export function EventsFeedList({
           <p className="text-sm text-bear">{error}</p>
         </GlassCard>
       )}
-      <div className="max-h-[520px] overflow-y-auto space-y-2 pr-1">
+      <div className="max-h-[min(65dvh,30rem)] overflow-y-auto space-y-2 pr-1">
         {loading && (
           <>
             {[0, 1, 2].map((i) => (

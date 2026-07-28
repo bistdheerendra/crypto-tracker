@@ -98,7 +98,14 @@ model Position {
   id            String    @id @default(cuid())
   assetSymbol   String
   amount        Float
+  closedAmount  Float     @default(0)
+  status        String    @default("open") // "open" | "closed"
   avgEntryPrice Float
+  stopLoss      Float?
+  takeProfit    Float?
+  exitedAt      DateTime?
+  exitPrice     Float?
+  realizedPnl   Float     @default(0)
   positionType  String // "spot" | "long" | "short"
   leverage      Float?
   entryDate     DateTime?
@@ -109,13 +116,26 @@ model Position {
   @@map("positions")
 }
 
+model PaperWallet {
+  id              String   @id @default(cuid())
+  startingBalance Float    @default(1000)
+  cashBalance     Float    @default(1000)
+  updatedAt       DateTime @updatedAt
+
+  @@map("paper_wallet")
+}
+
 /// Personal "taken" journal — soft-references Verdict by id (no FK on Verdict).
 /// Existence of a row means the user marked that verdict as taken.
 model JournalEntry {
-  id        String   @id @default(cuid())
-  verdictId String   @unique
-  note      String?
-  takenAt   DateTime @default(now())
+  id             String    @id @default(cuid())
+  verdictId      String    @unique
+  note           String?
+  takenAt        DateTime  @default(now())
+  /// Manual close — books personal PnL without waiting for SL/TP on the Verdict.
+  exitedAt       DateTime?
+  exitPrice      Float?
+  exitRMultiple  Float?
 
   @@map("journal_entries")
 }

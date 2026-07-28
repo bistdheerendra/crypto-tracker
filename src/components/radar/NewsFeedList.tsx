@@ -100,7 +100,7 @@ export function NewsFeedList({
           type="button"
           onClick={() => setShowSummary((v) => !v)}
           disabled={loading || !items.length}
-          className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-accent/30 bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="min-h-11 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-accent/30 bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {showSummary ? "Hide market pulse" : "Market pulse"}
         </button>
@@ -138,7 +138,7 @@ export function NewsFeedList({
         </GlassCard>
       )}
 
-      <div className="max-h-[418px] overflow-y-auto space-y-2 pr-1">
+      <div className="max-h-[min(60dvh,26rem)] sm:max-h-[min(64dvh,30rem)] overflow-y-auto space-y-2 pr-1">
         {loading && (
           <GlassCard className="!p-3">
             <p className="text-sm text-text-muted skeleton h-16" />

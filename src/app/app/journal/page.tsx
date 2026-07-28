@@ -5,28 +5,39 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { TierPill } from "@/components/ui/TierPill";
 import { useBinanceLivePrices } from "@/hooks/useBinanceLivePrices";
 import type { TrackRecordStats } from "@/lib/backtest/aggregator";
-import type { JournalEntryRow, JournalVerdictSummary } from "@/lib/journal/types";
+import { computeExitRMultiple } from "@/lib/journal/pnl";
+import {
+  isJournalTradeOpen,
+  type JournalEntryRow,
+  type JournalVerdictSummary,
+} from "@/lib/journal/types";
 import type { Tier } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
-function isOpenOutcome(outcome: string | null | undefined): boolean {
-  return !outcome || outcome === "open";
-}
-
-function outcomeLabel(outcome: string | null | undefined): {
-  text: string;
-  className: string;
-} {
-  if (isOpenOutcome(outcome)) {
+function outcomeLabel(
+  entry: JournalEntryRow,
+  verdict: JournalVerdictSummary | null | undefined
+): { text: string; className: string } {
+  if (entry.exitedAt) {
+    return { text: "Exited", className: "text-accent border-accent/30 bg-accent/10" };
+  }
+  const outcome = verdict?.outcome;
+  if (!outcome || outcome === "open") {
     return { text: "Open", className: "text-mixed border-mixed/30 bg-mixed/10" };
   }
   if (outcome === "tp1_hit" || outcome === "tp2_hit") {
-    return { text: outcome === "tp2_hit" ? "TP2" : "TP1", className: "text-bull border-bull/30 bg-bull/10" };
+    return {
+      text: outcome === "tp2_hit" ? "TP2" : "TP1",
+      className: "text-bull border-bull/30 bg-bull/10",
+    };
   }
   if (outcome === "sl_hit") {
     return { text: "SL", className: "text-bear border-bear/30 bg-bear/10" };
   }
-  return { text: outcome ?? "—", className: "text-text-muted border-white/10 bg-white/5" };
+  return {
+    text: outcome ?? "—",
+    className: "text-text-muted border-white/10 bg-white/5",
+  };
 }
 
 function formatTakenAt(iso: string): string {
@@ -52,13 +63,15 @@ function unrealizedPnl(
   v: JournalVerdictSummary,
   livePrice: number
 ): { rMultiple: number; pct: number; usdPerUnit: number } | null {
-  if (v.direction !== "LONG" && v.direction !== "SHORT") return null;
-  const risk = Math.abs(v.entryPrice - v.stopLoss) || v.entryPrice * 0.01;
-  if (!(risk > 0)) return null;
-
+  const rMultiple = computeExitRMultiple(
+    v.direction,
+    v.entryPrice,
+    v.stopLoss,
+    livePrice
+  );
+  if (rMultiple == null) return null;
   const move =
     v.direction === "LONG" ? livePrice - v.entryPrice : v.entryPrice - livePrice;
-  const rMultiple = parseFloat((move / risk).toFixed(2));
   const pct = parseFloat(((move / v.entryPrice) * 100).toFixed(2));
   const usdPerUnit = parseFloat(move.toFixed(2));
   return { rMultiple, pct, usdPerUnit };
@@ -78,6 +91,7 @@ export default function JournalPage() {
   const [systemStats, setSystemStats] = useState<TrackRecordStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exitingId, setExitingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,7 +129,7 @@ export default function JournalPage() {
   const openPairs = useMemo(() => {
     const pairs = new Set<string>();
     for (const e of entries) {
-      if (e.verdict && isOpenOutcome(e.verdict.outcome)) {
+      if (e.verdict && isJournalTradeOpen(e)) {
         pairs.add(e.verdict.pair);
       }
     }
@@ -123,6 +137,43 @@ export default function JournalPage() {
   }, [entries]);
 
   const { prices, live: pricesLive } = useBinanceLivePrices(openPairs);
+
+  async function handleExit(entry: JournalEntryRow) {
+    const v = entry.verdict;
+    if (!v || !isJournalTradeOpen(entry)) return;
+
+    const livePrice = prices[v.pair];
+    const preview =
+      livePrice != null ? unrealizedPnl(v, livePrice) : null;
+    const confirmMsg = preview
+      ? `Exit ${v.pair} at ~${formatPrice(livePrice!)}?\nBook ${preview.rMultiple >= 0 ? "+" : ""}${preview.rMultiple.toFixed(2)}R (${formatUsdPnl(preview.usdPerUnit)}/unit)`
+      : `Exit ${v.pair} at the current market price and book your P&L?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setExitingId(entry.verdictId);
+    setError(null);
+    try {
+      const res = await fetch(`/api/journal/${encodeURIComponent(entry.verdictId)}/exit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          livePrice != null && Number.isFinite(livePrice)
+            ? { exitPrice: livePrice }
+            : {}
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Exit failed");
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Exit failed");
+    } finally {
+      setExitingId(null);
+    }
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -244,13 +295,16 @@ export default function JournalPage() {
             <div className="space-y-3">
               {entries.map((entry) => {
                 const v = entry.verdict;
-                const outcome = outcomeLabel(v?.outcome);
-                const open = v ? isOpenOutcome(v.outcome) : false;
+                const outcome = outcomeLabel(entry, v);
+                const open = isJournalTradeOpen(entry);
                 const livePrice = v && open ? prices[v.pair] : null;
                 const live =
                   v && open && livePrice != null
                     ? unrealizedPnl(v, livePrice)
                     : null;
+                const bookedR = entry.exitRMultiple;
+                const systemR = !entry.exitedAt ? v?.rMultiple : null;
+                const displayR = bookedR ?? systemR;
 
                 return (
                   <GlassCard key={entry.id} className="!p-4">
@@ -277,19 +331,20 @@ export default function JournalPage() {
                       >
                         {outcome.text}
                       </span>
-                      {!open && v?.rMultiple != null && (
+                      {!open && displayR != null && (
                         <span
                           className={`font-mono-data text-xs ${
-                            v.rMultiple >= 0 ? "text-bull" : "text-bear"
+                            displayR >= 0 ? "text-bull" : "text-bear"
                           }`}
                         >
-                          {v.rMultiple >= 0 ? "+" : ""}
-                          {v.rMultiple.toFixed(2)}R
+                          {displayR >= 0 ? "+" : ""}
+                          {displayR.toFixed(2)}R
+                          {entry.exitedAt ? " booked" : ""}
                         </span>
                       )}
                       {live && (
                         <span
-                          className={`font-mono-data text-sm font-semibold inline-block min-w-[28ch] tabular-nums ${
+                          className={`font-mono-data text-sm font-semibold inline-block tabular-nums break-words sm:min-w-[28ch] ${
                             live.rMultiple >= 0 ? "text-bull" : "text-bear"
                           }`}
                         >
@@ -343,7 +398,7 @@ export default function JournalPage() {
                             <span className="w-1.5 h-1.5 rounded-full bg-bull pulse-dot shrink-0" />
                           )}
                           <span className="shrink-0">Mark</span>
-                          <span className="inline-block min-w-[11ch] tabular-nums text-left">
+                          <span className="inline-block tabular-nums text-left sm:min-w-[11ch]">
                             {formatPrice(livePrice)}
                           </span>
                           {pricesLive ? (
@@ -358,7 +413,7 @@ export default function JournalPage() {
                         </span>
                         {live && (
                           <span
-                            className={`ml-2 font-semibold inline-block min-w-[22ch] tabular-nums ${
+                            className={`ml-2 font-semibold inline-block tabular-nums break-words sm:min-w-[22ch] ${
                               live.rMultiple >= 0 ? "text-bull" : "text-bear"
                             }`}
                           >
@@ -369,21 +424,52 @@ export default function JournalPage() {
                         )}
                       </p>
                     )}
-                    {entry.note ? (
-                      <p className="text-sm text-text-muted leading-relaxed">
-                        <span className="uppercase text-text-muted/80 font-semibold tracking-wide">
-                          Note :{" "}
-                        </span>
-                        {entry.note}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-text-muted/60 italic">
-                        <span className="uppercase text-text-muted/80 font-semibold tracking-wide not-italic">
-                          Note :{" "}
-                        </span>
-                        No note
+                    {entry.exitedAt && entry.exitPrice != null && (
+                      <p className="text-xs text-text-muted font-mono-data mb-2">
+                        Exited {formatTakenAt(entry.exitedAt)} @{" "}
+                        {formatPrice(entry.exitPrice)}
+                        {entry.exitRMultiple != null && (
+                          <span
+                            className={`ml-1 font-semibold ${
+                              entry.exitRMultiple >= 0 ? "text-bull" : "text-bear"
+                            }`}
+                          >
+                            · {entry.exitRMultiple >= 0 ? "+" : ""}
+                            {entry.exitRMultiple.toFixed(2)}R booked
+                          </span>
+                        )}
                       </p>
                     )}
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {entry.note ? (
+                          <p className="text-sm text-text-muted leading-relaxed">
+                            <span className="uppercase text-text-muted/80 font-semibold tracking-wide">
+                              Note :{" "}
+                            </span>
+                            {entry.note}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-text-muted/60 italic">
+                            <span className="uppercase text-text-muted/80 font-semibold tracking-wide not-italic">
+                              Note :{" "}
+                            </span>
+                            No note
+                          </p>
+                        )}
+                      </div>
+                      {open && (
+                        <button
+                          type="button"
+                          onClick={() => void handleExit(entry)}
+                          disabled={exitingId === entry.verdictId}
+                          className="shrink-0 min-h-11 px-3 py-1.5 rounded-lg border border-bear/40 bg-bear/10 text-bear text-xs font-semibold hover:bg-bear/20 transition-colors disabled:opacity-50"
+                          title="Book P&L at the current market price without waiting for SL/TP"
+                        >
+                          {exitingId === entry.verdictId ? "Exiting…" : "Exit trade"}
+                        </button>
+                      )}
+                    </div>
                   </GlassCard>
                 );
               })}

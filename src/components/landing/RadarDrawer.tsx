@@ -38,7 +38,7 @@ export function RadarDrawer() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={`min-h-11 px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab
                       ? "text-accent border-b-2 border-accent"
                       : "text-text-muted hover:text-text-primary"
@@ -70,7 +70,7 @@ export function RadarDrawer() {
               )}
 
               {activeTab === "Whales" && !whales.loading && (
-                <table className="w-full text-sm min-w-[520px]">
+                <table className="w-full text-sm min-w-[440px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Address</th>
@@ -97,7 +97,7 @@ export function RadarDrawer() {
               )}
 
               {activeTab === "ETF Flows" && !etf.loading && (
-                <table className="w-full text-sm min-w-[400px]">
+                <table className="w-full text-sm min-w-[360px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Ticker</th>
@@ -122,7 +122,7 @@ export function RadarDrawer() {
               )}
 
               {activeTab === "Liquidations" && !liquidations.loading && (
-                <table className="w-full text-sm min-w-[480px]">
+                <table className="w-full text-sm min-w-[420px]">
                   <thead>
                     <tr className="text-xs text-text-muted uppercase tracking-wider">
                       <th className="text-left py-2 px-3">Exchange</th>

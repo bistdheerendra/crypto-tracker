@@ -27,6 +27,9 @@ export async function GET(_req: NextRequest, context: RouteContext) {
         verdictId: row.verdictId,
         note: row.note,
         takenAt: row.takenAt.toISOString(),
+        exitedAt: row.exitedAt ? row.exitedAt.toISOString() : null,
+        exitPrice: row.exitPrice,
+        exitRMultiple: row.exitRMultiple,
       },
     });
   } catch (err) {

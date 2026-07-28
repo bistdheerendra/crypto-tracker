@@ -59,7 +59,7 @@ export default function RadarPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-11 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
               activeTab === tab
                 ? "bg-accent/15 text-accent border border-accent/30"
                 : "text-text-muted hover:text-text-primary bg-white/5"
@@ -101,7 +101,7 @@ export default function RadarPage() {
             )}
 
             {!active.loading && activeTab === "Whales" && (
-              <table className="w-full text-sm min-w-[720px]">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                     <th className="text-left py-3 px-4">Address</th>
@@ -138,7 +138,7 @@ export default function RadarPage() {
             )}
 
             {!active.loading && activeTab === "ETF Flows" && (
-              <table className="w-full text-sm min-w-[720px]">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                     <th className="text-left py-3 px-4">Ticker</th>
@@ -173,7 +173,7 @@ export default function RadarPage() {
             )}
 
             {!active.loading && activeTab === "Liquidations" && (
-              <table className="w-full text-sm min-w-[720px]">
+              <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                     <th className="text-left py-3 px-4">Exchange</th>

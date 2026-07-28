@@ -64,7 +64,7 @@ export function ProgressRail() {
           {STAGES.map((stage, i) => (
             <span
               key={stage.id}
-              className={`text-[8px] tracking-wider transition-colors ${
+              className={`text-[7px] sm:text-[8px] tracking-wider transition-colors ${
                 i <= active ? "text-mixed" : "text-text-muted/40"
               }`}
             >

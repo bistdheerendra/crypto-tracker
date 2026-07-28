@@ -94,7 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <button
           type="button"
           onClick={() => setMenuOpen(true)}
-          className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
           aria-label="Open menu"
         >
           <Menu className="w-5 h-5" />
@@ -115,7 +115,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
                 aria-label="Close menu"
               >
                 <X className="w-5 h-5" />
@@ -133,7 +133,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <NavLinks />
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0 pt-14 lg:pt-0">{children}</main>
+      <main className="flex-1 overflow-auto min-w-0 pt-14 lg:pt-0">
+        <div className="mx-auto w-full max-w-[1920px]">{children}</div>
+      </main>
     </div>
   );
 }

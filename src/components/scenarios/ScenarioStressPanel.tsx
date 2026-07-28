@@ -100,7 +100,7 @@ function StressTables({
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[980px]">
+          <table className="w-full text-sm min-w-[760px]">
             <thead>
               <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                 <th className={`text-left ${cellPad}`}>Pair</th>
@@ -189,7 +189,7 @@ function StressTables({
                         <button
                           type="button"
                           onClick={() => onRemove(r.position.id)}
-                          className="text-xs text-text-muted hover:text-bear"
+                          className="inline-flex min-h-11 items-center text-xs text-text-muted hover:text-bear"
                         >
                           Remove
                         </button>
@@ -211,7 +211,7 @@ function StressTables({
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[520px]">
             <thead>
               <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                 <th className={`text-left ${cellPad}`}>Asset</th>

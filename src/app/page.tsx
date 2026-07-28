@@ -15,7 +15,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="relative w-full min-h-dvh overflow-x-hidden">
-      <nav className="fixed top-8 left-0 right-0 z-50 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-bg-primary/80 backdrop-blur-sm border-b border-white/8 lg:top-0 lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
+      <nav className="fixed top-7 left-0 right-0 z-50 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-bg-primary/80 backdrop-blur-sm border-b border-white/8 lg:top-0 lg:border-0 lg:bg-transparent lg:backdrop-blur-none">
         <BrandLogo href="/" size="md" />
         <div className="flex shrink-0 items-center gap-2 sm:gap-4 text-sm">
           <Link href="/auth/login" className="text-text-muted hover:text-text-primary transition-colors px-2 py-1">

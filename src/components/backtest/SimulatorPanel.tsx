@@ -209,7 +209,7 @@ export function SimulatorPanel({ onRun }: SimulatorPanelProps) {
               <h3 className="font-semibold text-sm">Trade Log</h3>
             </div>
             <div className="overflow-x-auto max-h-96 overflow-y-auto">
-              <table className="w-full text-sm min-w-[720px]">
+              <table className="w-full text-sm min-w-[620px]">
                 <thead className="sticky top-0 bg-bg-card z-10">
                   <tr className="text-xs text-text-muted uppercase tracking-wider bg-white/3">
                     <th className="text-left py-3 px-4">Entry Time</th>

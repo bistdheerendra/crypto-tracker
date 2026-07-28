@@ -30,7 +30,8 @@ function hasExpectedDelegates(client: any): boolean {
   return (
     typeof client?.verdict?.findMany === "function" &&
     typeof client?.position?.findMany === "function" &&
-    typeof client?.journalEntry?.findMany === "function"
+    typeof client?.journalEntry?.findMany === "function" &&
+    typeof client?.paperWallet?.findMany === "function"
   );
 }
 
@@ -56,6 +57,18 @@ function bustPrismaRequireCache(): void {
  */
 export function getPrisma(): any | null {
   if (!isDatabaseConfigured()) return null;
+
+  // In Next.js dev/HMR, schema changes can leave a stale Prisma singleton in memory.
+  // Recreate client eagerly so new model fields (e.g. exitedAt) are immediately available.
+  if (process.env.NODE_ENV !== "production" && globalForPrisma.prisma) {
+    try {
+      void globalForPrisma.prisma.$disconnect();
+    } catch {
+      // ignore
+    }
+    globalForPrisma.prisma = undefined;
+    bustPrismaRequireCache();
+  }
 
   if (globalForPrisma.prisma && !hasExpectedDelegates(globalForPrisma.prisma)) {
     try {

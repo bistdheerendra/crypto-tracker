@@ -1,83 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { computeTrackRecord } from "@/lib/backtest/aggregator";
 import { getPrisma } from "@/lib/db";
-import type { JournalEntryRow, JournalVerdictSummary } from "@/lib/journal/types";
-import type { Bias, Direction, Tier } from "@/lib/types";
-import type { StoredVerdict, VerdictOutcome } from "@/lib/verdicts/types";
-
-type VerdictJoinRow = {
-  id: string;
-  pair: string;
-  timeframe: string;
-  direction: string;
-  confidenceTier: string;
-  entryPrice: number;
-  stopLoss: number;
-  takeProfit1: number;
-  takeProfit2: number;
-  laneBiasTechnical: string;
-  laneBiasFlow: string;
-  laneBiasNarrative: string;
-  laneBiasMacro: string;
-  createdAt: Date;
-  outcome: string | null;
-  outcomePrice: number | null;
-  outcomeAt: Date | null;
-  rMultiple: number | null;
-};
-
-function toVerdictSummary(row: VerdictJoinRow): JournalVerdictSummary {
-  return {
-    pair: row.pair,
-    direction: row.direction,
-    tier: row.confidenceTier,
-    outcome: row.outcome,
-    rMultiple: row.rMultiple,
-    entryPrice: row.entryPrice,
-    stopLoss: row.stopLoss,
-    takeProfit1: row.takeProfit1,
-    takeProfit2: row.takeProfit2,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-function toStoredVerdict(row: VerdictJoinRow): StoredVerdict {
-  return {
-    id: row.id,
-    pair: row.pair,
-    timeframe: row.timeframe,
-    direction: row.direction as Direction,
-    confidenceTier: row.confidenceTier as Tier,
-    entryPrice: row.entryPrice,
-    stopLoss: row.stopLoss,
-    takeProfit1: row.takeProfit1,
-    takeProfit2: row.takeProfit2,
-    laneBiases: {
-      technical: row.laneBiasTechnical as Bias,
-      flow: row.laneBiasFlow as Bias,
-      narrative: row.laneBiasNarrative as Bias,
-      macro: row.laneBiasMacro as Bias,
-    },
-    createdAt: row.createdAt.toISOString(),
-    outcome: (row.outcome as VerdictOutcome | null) ?? null,
-    outcomePrice: row.outcomePrice,
-    outcomeAt: row.outcomeAt ? row.outcomeAt.toISOString() : null,
-    rMultiple: row.rMultiple,
-  };
-}
-
-function serializeEntry(
-  entry: { id: string; verdictId: string; note: string | null; takenAt: Date },
-  verdict: VerdictJoinRow | undefined
-): JournalEntryRow {
-  return {
-    id: entry.id,
-    verdictId: entry.verdictId,
-    note: entry.note,
-    takenAt: entry.takenAt.toISOString(),
-    verdict: verdict ? toVerdictSummary(verdict) : null,
-  };
-}
+import {
+  serializeJournalEntry,
+  toStoredVerdict,
+  type JournalDbRow,
+  type VerdictJoinRow,
+} from "@/lib/journal/serialize";
+import type { JournalEntryRow } from "@/lib/journal/types";
+import type { StoredVerdict } from "@/lib/verdicts/types";
 
 export async function GET() {
   try {
@@ -89,11 +20,11 @@ export async function GET() {
       );
     }
 
-    const rows = await prisma.journalEntry.findMany({
+    const rows: JournalDbRow[] = await prisma.journalEntry.findMany({
       orderBy: { takenAt: "desc" },
     });
 
-    const verdictIds = rows.map((r: { verdictId: string }) => r.verdictId);
+    const verdictIds = rows.map((r) => r.verdictId);
     const verdictRows: VerdictJoinRow[] =
       verdictIds.length > 0
         ? await prisma.verdict.findMany({
@@ -102,14 +33,20 @@ export async function GET() {
         : [];
 
     const byId = new Map(verdictRows.map((v) => [v.id, v]));
-    const entries: JournalEntryRow[] = rows.map(
-      (row: { id: string; verdictId: string; note: string | null; takenAt: Date }) =>
-        serializeEntry(row, byId.get(row.verdictId))
+    const entries: JournalEntryRow[] = rows.map((row) =>
+      serializeJournalEntry(row, byId.get(row.verdictId))
     );
 
     const personalStats =
       verdictRows.length > 0
-        ? computeTrackRecord(verdictRows.map(toStoredVerdict))
+        ? computeTrackRecord(
+            rows
+              .map((row) => {
+                const v = byId.get(row.verdictId);
+                return v ? toStoredVerdict(v, row) : null;
+              })
+              .filter((v): v is StoredVerdict => v != null)
+          )
         : null;
 
     return NextResponse.json({
@@ -164,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.journalEntry.findUnique({ where: { verdictId } });
 
-    let row: { id: string; verdictId: string; note: string | null; takenAt: Date };
+    let row: JournalDbRow;
     if (existing) {
       row = await prisma.journalEntry.update({
         where: { verdictId },
@@ -180,7 +117,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { entry: serializeEntry(row, verdict as VerdictJoinRow) },
+      { entry: serializeJournalEntry(row, verdict as VerdictJoinRow) },
       { status: existing ? 200 : 201 }
     );
   } catch (err) {

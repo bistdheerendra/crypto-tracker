@@ -33,7 +33,7 @@ export default function ChartsPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-3.5rem)] lg:h-screen p-4 sm:p-6 gap-4">
+    <div className="flex flex-col min-h-[calc(100dvh-3.5rem)] lg:min-h-dvh p-4 sm:p-6 lg:p-8 gap-4">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shrink-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold mb-0.5">Charts</h1>
@@ -61,7 +61,7 @@ export default function ChartsPage() {
                 key={tf.interval}
                 type="button"
                 onClick={() => setChartInterval(tf.interval)}
-                className={`px-3 py-2 rounded-lg text-sm font-mono-data whitespace-nowrap transition-colors ${
+                className={`min-h-11 px-3 py-2 rounded-lg text-sm font-mono-data whitespace-nowrap transition-colors ${
                   chartInterval === tf.interval
                     ? "bg-accent/15 text-accent border border-accent/30"
                     : "text-text-muted hover:text-text-primary bg-white/5 border border-transparent"
@@ -77,7 +77,7 @@ export default function ChartsPage() {
             onClick={() => setShowDrawings((prev) => !prev)}
             aria-pressed={showDrawings}
             title={showDrawings ? "Hide chart drawings" : "Show chart drawings"}
-            className={`px-3 py-2 rounded-lg text-sm font-mono-data whitespace-nowrap transition-colors ${
+            className={`min-h-11 px-3 py-2 rounded-lg text-sm font-mono-data whitespace-nowrap transition-colors ${
               showDrawings
                 ? "bg-accent/15 text-accent border border-accent/30"
                 : "text-text-muted hover:text-text-primary bg-white/5 border border-white/8"
@@ -89,7 +89,7 @@ export default function ChartsPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
-        <div className="flex-1 min-h-[500px] lg:min-h-0 rounded-xl border border-white/8 overflow-hidden bg-bg-card">
+        <div className="flex-1 min-h-[320px] sm:min-h-[420px] lg:min-h-0 rounded-xl border border-white/8 overflow-hidden bg-bg-card">
           <LiveCandleChart
             pair={pair}
             interval={chartInterval}
@@ -98,7 +98,7 @@ export default function ChartsPage() {
           />
         </div>
 
-        <div className="w-full lg:w-96 shrink-0 min-h-0 max-h-[70vh] lg:max-h-none self-stretch flex flex-col overflow-hidden">
+        <div className="w-full lg:w-[clamp(22rem,26vw,28rem)] shrink-0 min-h-0 max-h-[min(72dvh,40rem)] lg:max-h-none self-stretch flex flex-col overflow-hidden">
           <VerdictCard
             pair={pair}
             interval={chartInterval}

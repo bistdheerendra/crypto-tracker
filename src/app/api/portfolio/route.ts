@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
+import { getPrice } from "@/lib/binance";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
-import type { PositionRow, SignalHint } from "@/lib/portfolio/types";
+import { getOrCreatePaperWallet } from "@/lib/paperWallet";
+import type { PaperWallet, PositionRow, SignalHint } from "@/lib/portfolio/types";
 
 const POSITION_TYPES = new Set(["spot", "long", "short"]);
 const TRACKED_SET = new Set<string>(TRACKED_PAIRS);
@@ -10,7 +12,14 @@ function serializePosition(row: {
   id: string;
   assetSymbol: string;
   amount: number;
+  closedAmount: number;
+  status: string;
   avgEntryPrice: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  exitedAt: Date | null;
+  exitPrice: number | null;
+  realizedPnl: number;
   positionType: string;
   leverage: number | null;
   entryDate: Date | null;
@@ -21,11 +30,32 @@ function serializePosition(row: {
     id: row.id,
     assetSymbol: row.assetSymbol,
     amount: row.amount,
+    closedAmount: row.closedAmount,
+    status: row.status,
     avgEntryPrice: row.avgEntryPrice,
+    stopLoss: row.stopLoss,
+    takeProfit: row.takeProfit,
+    exitedAt: row.exitedAt ? row.exitedAt.toISOString() : null,
+    exitPrice: row.exitPrice,
+    realizedPnl: row.realizedPnl,
     positionType: row.positionType,
     leverage: row.leverage,
     entryDate: row.entryDate ? row.entryDate.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function serializeWallet(row: {
+  id: string;
+  startingBalance: number;
+  cashBalance: number;
+  updatedAt: Date;
+}): PaperWallet {
+  return {
+    id: row.id,
+    startingBalance: row.startingBalance,
+    cashBalance: row.cashBalance,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -63,6 +93,26 @@ function parsePositionBody(body: Record<string, unknown>, partial = false) {
     errors.push("avgEntryPrice is required");
   }
 
+  let stopLoss: number | null | undefined;
+  if (body.stopLoss === null || body.stopLoss === "" || body.stopLoss === undefined) {
+    if (!partial) stopLoss = null;
+  } else {
+    stopLoss = Number(body.stopLoss);
+    if (!Number.isFinite(stopLoss) || stopLoss <= 0) {
+      errors.push("stopLoss must be a positive number when set");
+    }
+  }
+
+  let takeProfit: number | null | undefined;
+  if (body.takeProfit === null || body.takeProfit === "" || body.takeProfit === undefined) {
+    if (!partial) takeProfit = null;
+  } else {
+    takeProfit = Number(body.takeProfit);
+    if (!Number.isFinite(takeProfit) || takeProfit <= 0) {
+      errors.push("takeProfit must be a positive number when set");
+    }
+  }
+
   let positionType: string | undefined;
   if (typeof body.positionType === "string") {
     positionType = body.positionType.trim().toLowerCase();
@@ -94,7 +144,71 @@ function parsePositionBody(body: Record<string, unknown>, partial = false) {
     entryDate = null;
   }
 
-  return { errors, assetSymbol, amount, avgEntryPrice, positionType, leverage, entryDate };
+  return {
+    errors,
+    assetSymbol,
+    amount,
+    avgEntryPrice,
+    stopLoss,
+    takeProfit,
+    positionType,
+    leverage,
+    entryDate,
+  };
+}
+
+function parseCreateBody(body: Record<string, unknown>) {
+  const errors: string[] = [];
+  const assetSymbol =
+    typeof body.assetSymbol === "string" ? body.assetSymbol.trim() : "";
+  if (!assetSymbol) errors.push("assetSymbol is required");
+  else if (!TRACKED_SET.has(assetSymbol)) {
+    errors.push(`assetSymbol must be one of: ${TRACKED_PAIRS.join(", ")}`);
+  }
+
+  const usdAmount = Number(body.usdAmount);
+  if (!Number.isFinite(usdAmount) || usdAmount <= 0) {
+    errors.push("usdAmount must be a positive number");
+  }
+
+  const positionType =
+    typeof body.positionType === "string" ? body.positionType.trim().toLowerCase() : "";
+  if (!POSITION_TYPES.has(positionType)) {
+    errors.push('positionType must be "spot", "long", or "short"');
+  }
+
+  const stopLoss =
+    body.stopLoss === null || body.stopLoss === "" || body.stopLoss === undefined
+      ? null
+      : Number(body.stopLoss);
+  if (stopLoss != null && (!Number.isFinite(stopLoss) || stopLoss <= 0)) {
+    errors.push("stopLoss must be a positive number when set");
+  }
+
+  const takeProfit =
+    body.takeProfit === null || body.takeProfit === "" || body.takeProfit === undefined
+      ? null
+      : Number(body.takeProfit);
+  if (takeProfit != null && (!Number.isFinite(takeProfit) || takeProfit <= 0)) {
+    errors.push("takeProfit must be a positive number when set");
+  }
+
+  const leverage =
+    body.leverage === null || body.leverage === "" || body.leverage === undefined
+      ? null
+      : Number(body.leverage);
+  if (leverage != null && (!Number.isFinite(leverage) || leverage <= 0)) {
+    errors.push("leverage must be a positive number when set");
+  }
+
+  let entryDate: Date | null = null;
+  if (typeof body.entryDate === "string" && body.entryDate.trim() !== "") {
+    const d = new Date(body.entryDate);
+    if (Number.isNaN(d.getTime())) errors.push("entryDate must be a valid date");
+    else entryDate = d;
+  }
+
+  return { errors, assetSymbol, usdAmount, positionType, stopLoss, takeProfit, leverage, entryDate };
 }
 
 async function loadSignalsForPairs(
@@ -137,16 +251,24 @@ export async function GET() {
       );
     }
 
-    const rows = await prisma.position.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const [rows, wallet] = await Promise.all([
+      prisma.position.findMany({
+        orderBy: { createdAt: "desc" },
+      }),
+      getOrCreatePaperWallet(prisma),
+    ]);
     const positions: PositionRow[] = rows.map(serializePosition);
     const pairs: string[] = [
       ...new Set(positions.map((p) => p.assetSymbol)),
     ];
     const signals = await loadSignalsForPairs(prisma, pairs);
 
-    return NextResponse.json({ positions, signals, count: positions.length });
+    return NextResponse.json({
+      positions,
+      signals,
+      wallet: serializeWallet(wallet),
+      count: positions.length,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load portfolio";
     console.error("[portfolio] GET failed:", err);
@@ -168,25 +290,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    const parsed = parsePositionBody(body, false);
+    const parsed = parseCreateBody(body);
     if (parsed.errors.length) {
       return NextResponse.json({ error: parsed.errors.join("; ") }, { status: 400 });
     }
 
-    const row = await prisma.position.create({
-      data: {
-        assetSymbol: parsed.assetSymbol!,
-        amount: parsed.amount!,
-        avgEntryPrice: parsed.avgEntryPrice!,
-        positionType: parsed.positionType!,
-        leverage: parsed.leverage ?? null,
-        entryDate: parsed.entryDate ?? null,
-      },
+    const entryPrice = await getPrice(parsed.assetSymbol);
+    if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
+      return NextResponse.json({ error: "Failed to fetch a valid market price" }, { status: 503 });
+    }
+    const amount = parsed.usdAmount / entryPrice;
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      const wallet = await getOrCreatePaperWallet(tx);
+      if (parsed.usdAmount > wallet.cashBalance) {
+        throw new Error("Insufficient cash balance");
+      }
+
+      const updatedWallet = await tx.paperWallet.update({
+        where: { id: wallet.id },
+        data: { cashBalance: wallet.cashBalance - parsed.usdAmount },
+      });
+
+      const row = await tx.position.create({
+        data: {
+          assetSymbol: parsed.assetSymbol,
+          amount,
+          avgEntryPrice: entryPrice,
+          stopLoss: parsed.stopLoss,
+          takeProfit: parsed.takeProfit,
+          positionType: parsed.positionType,
+          leverage: parsed.leverage,
+          entryDate: parsed.entryDate,
+        },
+      });
+
+      return { row, wallet: updatedWallet };
     });
 
-    return NextResponse.json({ position: serializePosition(row) }, { status: 201 });
+    return NextResponse.json(
+      { position: serializePosition(result.row), wallet: serializeWallet(result.wallet) },
+      { status: 201 }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create position";
+    if (message === "Insufficient cash balance") {
+      return NextResponse.json(
+        { error: "Insufficient cash balance for this order size" },
+        { status: 400 }
+      );
+    }
     console.error("[portfolio] POST failed:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -219,6 +372,8 @@ export async function PUT(req: NextRequest) {
   if (parsed.assetSymbol !== undefined) data.assetSymbol = parsed.assetSymbol;
   if (parsed.amount !== undefined) data.amount = parsed.amount;
   if (parsed.avgEntryPrice !== undefined) data.avgEntryPrice = parsed.avgEntryPrice;
+  if (parsed.stopLoss !== undefined) data.stopLoss = parsed.stopLoss;
+  if (parsed.takeProfit !== undefined) data.takeProfit = parsed.takeProfit;
   if (parsed.positionType !== undefined) data.positionType = parsed.positionType;
   if (parsed.leverage !== undefined) data.leverage = parsed.leverage;
   if (parsed.entryDate !== undefined) data.entryDate = parsed.entryDate;

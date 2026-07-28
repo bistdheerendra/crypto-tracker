@@ -168,25 +168,31 @@ export default function AnalyzePage() {
             }`}>
               {verdict.direction}
             </span>
-            {verdict.direction === "NEUTRAL" && (
-              <span className="px-3 py-1 rounded border border-mixed/30 bg-mixed/10 text-mixed text-sm font-bold font-mono-data">
-                NO TRADE
-              </span>
-            )}
             {mlEdge != null && <MlEdgeBadge winProbability={mlEdge.winProbability} />}
             {regime && (
               <RegimeBadge regime={regime.regime} direction={regime.direction} />
             )}
             <span className="text-xs text-text-muted sm:ml-auto w-full sm:w-auto">{verdict.alignment}</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div><p className="text-[10px] uppercase text-text-muted mb-1">Entry</p><p className="font-mono-data text-xl text-bull">${verdict.entry.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
-            <div><p className="text-[10px] uppercase text-text-muted mb-1">Stop Loss</p><p className="font-mono-data text-xl text-bear">${verdict.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
-            <div><p className="text-[10px] uppercase text-text-muted mb-1">TP 1</p><p className="font-mono-data text-xl text-bull">${verdict.takeProfit1.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
-            <div><p className="text-[10px] uppercase text-text-muted mb-1">TP 2</p><p className="font-mono-data text-xl text-bull">${verdict.takeProfit2.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
-          </div>
+          {verdict.direction === "NEUTRAL" ? (
+            <div className="rounded-lg border border-mixed/30 bg-mixed/10 px-4 py-3 mb-4">
+              <p className="text-sm font-semibold text-mixed font-mono-data">NO TRADE</p>
+              <p className="text-xs text-text-muted mt-1">
+                Lanes not aligned — wait for a clearer LONG or SHORT setup.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div><p className="text-[10px] uppercase text-text-muted mb-1">Entry</p><p className="font-mono-data text-xl text-bull">${verdict.entry.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+                <div><p className="text-[10px] uppercase text-text-muted mb-1">Stop Loss</p><p className="font-mono-data text-xl text-bear">${verdict.stopLoss.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+                <div><p className="text-[10px] uppercase text-text-muted mb-1">TP 1</p><p className="font-mono-data text-xl text-bull">${verdict.takeProfit1.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+                <div><p className="text-[10px] uppercase text-text-muted mb-1">TP 2</p><p className="font-mono-data text-xl text-bull">${verdict.takeProfit2.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p></div>
+              </div>
+              <p className="text-xs text-accent font-mono-data mb-2">Risk:Reward {verdict.riskReward}</p>
+            </>
+          )}
           <p className="text-sm text-text-muted">{verdict.rationale}</p>
-          <p className="text-xs text-accent font-mono-data mt-2">Risk:Reward {verdict.riskReward}</p>
           {verdict.direction !== "NEUTRAL" && (
             <JournalTakenControl verdictId={verdictId} />
           )}

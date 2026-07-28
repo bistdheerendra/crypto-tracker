@@ -13,6 +13,21 @@ import type { CalendarEvent, NewsItem, Verdict } from "@/lib/types";
 
 import { DASHBOARD_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 
+function isValidVerdict(value: unknown): value is Verdict {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<Verdict>;
+  return (
+    typeof v.pair === "string" &&
+    typeof v.timeframe === "string" &&
+    typeof v.direction === "string" &&
+    typeof v.tier === "string" &&
+    typeof v.entry === "number" &&
+    typeof v.stopLoss === "number" &&
+    typeof v.takeProfit1 === "number" &&
+    typeof v.riskReward === "string"
+  );
+}
+
 export default function DashboardPage() {
   const [verdicts, setVerdicts] = useState<Verdict[]>([]);
   const [prices, setPrices] = useState<Record<string, number | null>>({});
@@ -49,11 +64,11 @@ export default function DashboardPage() {
       DASHBOARD_PAIRS.map((pair) =>
         fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`)
           .then((r) => r.json())
-          .then((d) => d.verdict as Verdict)
+          .then((d) => d.verdict)
           .catch(() => null)
       )
     ).then((results) => {
-      setVerdicts(results.filter((v): v is Verdict => v !== null));
+      setVerdicts(results.filter(isValidVerdict));
       setLoadingVerdicts(false);
     });
   }, [timeframe]);
@@ -135,12 +150,16 @@ export default function DashboardPage() {
                   <RegimeBadge regime={regime.regime} direction={regime.direction} />
                 )}
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono-data">
-                <div><span className="text-text-muted">Entry </span><span className="text-bull">${v.entry.toFixed(0)}</span></div>
-                <div><span className="text-text-muted">SL </span><span className="text-bear">${v.stopLoss.toFixed(0)}</span></div>
-                <div><span className="text-text-muted">TP1 </span><span className="text-bull">${v.takeProfit1.toFixed(0)}</span></div>
-                <div><span className="text-text-muted">R:R </span><span className="text-accent">{v.riskReward}</span></div>
-              </div>
+              {v.direction === "NEUTRAL" ? (
+                <p className="text-sm font-semibold text-mixed font-mono-data">NO TRADE</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono-data">
+                  <div><span className="text-text-muted">Entry </span><span className="text-bull">${v.entry.toFixed(0)}</span></div>
+                  <div><span className="text-text-muted">SL </span><span className="text-bear">${v.stopLoss.toFixed(0)}</span></div>
+                  <div><span className="text-text-muted">TP1 </span><span className="text-bull">${v.takeProfit1.toFixed(0)}</span></div>
+                  <div><span className="text-text-muted">R:R </span><span className="text-accent">{v.riskReward}</span></div>
+                </div>
+              )}
             </GlassCard>
             );
           })}

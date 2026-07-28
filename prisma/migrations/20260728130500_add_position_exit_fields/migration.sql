@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "positions"
+ADD COLUMN "exitedAt" TIMESTAMP(3),
+ADD COLUMN "exitPrice" DOUBLE PRECISION,
+ADD COLUMN "realizedPnl" DOUBLE PRECISION;

@@ -18,6 +18,9 @@ export type JournalEntryRow = {
   verdictId: string;
   note: string | null;
   takenAt: string;
+  exitedAt: string | null;
+  exitPrice: number | null;
+  exitRMultiple: number | null;
   verdict: JournalVerdictSummary | null;
 };
 
@@ -27,3 +30,10 @@ export type JournalListResponse = {
   personalStats: TrackRecordStats | null;
   error?: string;
 };
+
+/** Still open for the user: no personal exit, and Verdict not SL/TP/expired yet. */
+export function isJournalTradeOpen(entry: JournalEntryRow): boolean {
+  if (entry.exitedAt) return false;
+  const outcome = entry.verdict?.outcome;
+  return !outcome || outcome === "open";
+}
