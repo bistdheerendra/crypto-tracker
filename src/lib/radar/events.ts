@@ -108,7 +108,7 @@ async function fetchBinanceCatalog(
     headers: {
       Accept: "application/json",
       "User-Agent":
-        "Mozilla/5.0 (compatible; DeepCurrent/1.0; +https://deepcurrent.app)",
+        "Mozilla/5.0 (compatible; Dheerendra-Intelligence/1.0; +https://deepcurrent.app)",
       clienttype: "web",
       lang: "en",
     },

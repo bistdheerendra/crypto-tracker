@@ -1,4 +1,4 @@
-# DeepCurrent — Complete Project Documentation
+# Dheerendra Intelligence — Complete Project Documentation
 
 > Crypto trading intelligence app. Repo / package: **deepcurrent**. UI brand: **Dheerendra Intelligence**.  
 > Yeh document poora **shipped** system explain karta hai — architecture, features, data flow, APIs, ML loop, setup.
@@ -26,7 +26,7 @@ Aaj ka major work (yeh sections pehle outdated the — ab sync hain):
 
 ## 0. Short summary (Hinglish)
 
-DeepCurrent ek **Next.js** web app hai jo traders ko sirf chart nahi dikhata — **market move ke peeche ka cause** batata hai.
+Dheerendra Intelligence ek **Next.js** web app hai jo traders ko sirf chart nahi dikhata — **market move ke peeche ka cause** batata hai.
 
 **Poora live loop (jo ab tak wired hai):**
 
@@ -51,7 +51,7 @@ Traders usually alag-alag sources pe depend karte hain: chart indicators, future
 
 ### Solution
 
-DeepCurrent ek hi pipeline mein sab jodta hai:
+Dheerendra Intelligence ek hi pipeline mein sab jodta hai:
 
 | Layer | Kya milta hai | Status |
 |-------|----------------|--------|

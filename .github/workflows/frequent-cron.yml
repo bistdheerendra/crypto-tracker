@@ -1,4 +1,4 @@
-name: Frequent DeepCurrent crons
+name: Frequent Dheerendra Intelligence crons
 
 # Vercel Hobby cron is daily-only. This workflow densifies track-record + alerts.
 # Secrets: CRON_BASE_URL (https://your-app.vercel.app), CRON_SECRET

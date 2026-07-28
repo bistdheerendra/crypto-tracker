@@ -1,4 +1,4 @@
-// DeepCurrent — durable verdicts + point-in-time ML features
+// Dheerendra Intelligence — durable verdicts + point-in-time ML features
 // Connection URLs live in prisma.config.ts (Prisma v7). Env vars: DATABASE_URL + DIRECT_URL.
 
 generator client {

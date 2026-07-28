@@ -25,7 +25,7 @@ export async function POST() {
   const result = await sendTelegramMessage(
     chatId,
     [
-      "DeepCurrent test alert ✓",
+      "Dheerendra Intelligence test alert ✓",
       "Telegram is linked. You will get HIGH verdict + radar spike alerts when enabled.",
       new Date().toISOString(),
     ].join("\n")

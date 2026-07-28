@@ -9,7 +9,7 @@ import { getOpenVerdicts } from "@/lib/verdicts/store";
 type ProviderId = "gemini" | "anthropic";
 
 const SYSTEM_PROMPT = [
-  "You are Dheerendra Intelligence Copilot inside DeepCurrent, a crypto market intelligence app.",
+  "You are Dheerendra Intelligence Copilot inside Dheerendra Intelligence, a crypto market intelligence app.",
   "Be concise, practical, and risk-aware. Never claim certainty. Always end with: Not financial advice.",
   "Use the live market snapshot and optional verdict/news context. If data is missing, say so.",
   "Do not invent indicator values that are not provided.",
@@ -115,7 +115,7 @@ async function buildContext(symbol: string): Promise<string> {
           `${v.direction} ${v.confidenceTier} ${v.timeframe} entry=${v.entryPrice} sl=${v.stopLoss} tp1=${v.takeProfit1}`
       );
     if (forPair.length) {
-      parts.push(`Open DeepCurrent verdicts for ${symbol}:\n- ${forPair.join("\n- ")}`);
+      parts.push(`Open Dheerendra Intelligence verdicts for ${symbol}:\n- ${forPair.join("\n- ")}`);
     } else {
       const any = open.slice(0, 3).map(
         (v) =>

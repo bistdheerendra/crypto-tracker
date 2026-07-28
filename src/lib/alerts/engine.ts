@@ -37,7 +37,7 @@ export function parseUsdCompact(value: string): number {
 
 function whaleAlertText(w: WhaleTransaction, usd: number): string {
   return [
-    "DeepCurrent Whale spike",
+    "Dheerendra Intelligence Whale spike",
     `${w.chain} · ${w.direction}`,
     `${w.amount} (~$${Math.round(usd).toLocaleString()})`,
     `Addr ${w.address}`,
@@ -49,7 +49,7 @@ function whaleAlertText(w: WhaleTransaction, usd: number): string {
 
 function liqAlertText(l: Liquidation, usd: number): string {
   return [
-    "DeepCurrent Liquidation spike",
+    "Dheerendra Intelligence Liquidation spike",
     `${l.exchange} · ${l.pair} · ${l.side.toUpperCase()}`,
     `~$${Math.round(usd).toLocaleString()}`,
     l.timeAgo,
@@ -61,7 +61,7 @@ function liqAlertText(l: Liquidation, usd: number): string {
 function etfAlertText(f: ETFFlow): string {
   const sign = f.netFlow >= 0 ? "+" : "";
   return [
-    "DeepCurrent ETF flow spike",
+    "Dheerendra Intelligence ETF flow spike",
     `${f.ticker} · ${f.name}`,
     `Net ${sign}$${Math.round(f.netFlow).toLocaleString()}`,
     `As of ${f.date}`,

@@ -17,7 +17,7 @@ export async function GET() {
           letterSpacing: -3,
         }}
       >
-        DC
+        D
       </div>
     ),
     {

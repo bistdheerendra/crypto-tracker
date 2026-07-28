@@ -1,4 +1,4 @@
-# DeepCurrent
+# Dheerendra Intelligence
 
 Crypto trading intelligence — market move ke peeche ka cause dikhata hai, sirf price chart nahi.
 

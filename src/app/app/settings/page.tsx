@@ -102,7 +102,7 @@ export default function SettingsPage() {
     <div className="p-4 sm:p-6 lg:p-8 max-w-2xl">
       <h1 className="text-xl sm:text-2xl font-bold mb-1">Settings</h1>
       <p className="text-text-muted text-sm mb-6 sm:mb-8">
-        Telegram alerts and watchlist for your solo DeepCurrent setup.
+        Telegram alerts and watchlist for your solo Dheerendra Intelligence setup.
       </p>
 
       {(status || error) && (

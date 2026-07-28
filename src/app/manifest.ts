@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Dheerendra Intelligence",
-    short_name: "DeepCurrent",
+    short_name: "Dheerendra Intelligence",
     description:
       "See the cause behind every market move. Four independent analysis lanes. One synthesized verdict.",
     start_url: "/",

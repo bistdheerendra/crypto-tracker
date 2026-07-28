@@ -1,6 +1,6 @@
 # Institutional Radar — How It Works
 
-> **Institutional Radar** DeepCurrent ka live market-pulse section hai. Ye teen cheezein dikhata hai: **whale transactions**, **ETF activity**, aur **liquidation events** — sab external APIs se fetch hoke UI mein tables ke roop mein render hota hai.
+> **Institutional Radar** Dheerendra Intelligence ka live market-pulse section hai. Ye teen cheezein dikhata hai: **whale transactions**, **ETF activity**, aur **liquidation events** — sab external APIs se fetch hoke UI mein tables ke roop mein render hota hai.
 
 ---
 

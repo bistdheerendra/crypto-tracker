@@ -26,7 +26,7 @@ function formatVerdictMessage(verdict: Verdict, lanes: LaneOutput[]): string {
     .join(" · ");
 
   return [
-    `DeepCurrent ${verdict.tier} ${verdict.direction}`,
+    `Dheerendra Intelligence ${verdict.tier} ${verdict.direction}`,
     `${verdict.pair} · ${verdict.timeframe}`,
     "",
     `Entry  ${verdict.entry}`,

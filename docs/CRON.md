@@ -1,4 +1,4 @@
-# Frequent DeepCurrent crons (Hobby Vercel = daily max)
+# Frequent Dheerendra Intelligence crons (Hobby Vercel = daily max)
 
 Vercel Cron on Hobby can only run **once per day**. Dense track-record
 needs more frequent hits — use **GitHub Actions** (this repo) and/or
