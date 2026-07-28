@@ -157,7 +157,8 @@ export function LiveCandleChart({
     if (!container) return;
 
     const chart = createChart(container, {
-      autoSize: true,
+      width: Math.max(container.clientWidth, 280),
+      height: Math.max(container.clientHeight, 320),
       layout: {
         background: { type: ColorType.Solid, color: "#03060f" },
         textColor: "#8b93a7",
@@ -188,10 +189,18 @@ export function LiveCandleChart({
 
     priceLinesRef.current = applyLevelLines(series, levelsRef.current, priceLinesRef.current);
 
-    const observer = new ResizeObserver(() => {
-      if (container.clientWidth > 0 && container.clientHeight > 0) {
-        chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+    const syncChartSize = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      if (width > 0 && height > 0) {
+        chart.resize(width, height);
       }
+    };
+
+    requestAnimationFrame(syncChartSize);
+
+    const observer = new ResizeObserver(() => {
+      syncChartSize();
     });
     observer.observe(container);
 
@@ -326,7 +335,7 @@ export function LiveCandleChart({
     ((levels.supports?.length ?? 0) > 0 || (levels.resistances?.length ?? 0) > 0);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full min-h-80 w-full">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg-card z-10">
           <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
@@ -360,7 +369,7 @@ export function LiveCandleChart({
           )}
         </div>
       )}
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="h-full min-h-80 w-full" />
     </div>
   );
 }

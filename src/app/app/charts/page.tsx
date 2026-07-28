@@ -89,7 +89,7 @@ export default function ChartsPage() {
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
-        <div className="flex-1 min-h-[320px] sm:min-h-[420px] lg:min-h-0 rounded-xl border border-white/8 overflow-hidden bg-bg-card">
+        <div className="h-[min(54dvh,30rem)] sm:h-[min(60dvh,36rem)] lg:h-auto lg:flex-1 lg:min-h-0 rounded-xl border border-white/8 overflow-hidden bg-bg-card">
           <LiveCandleChart
             pair={pair}
             interval={chartInterval}

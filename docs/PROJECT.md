@@ -7,9 +7,9 @@
 
 ---
 
-## Changelog — 24 Jul 2026 (share with Claude)
+## Changelog — 28 Jul 2026 (share with Claude)
 
-Aaj ka major work (yeh sections pehle outdated the — ab sync hain):
+Aaj tak ka major work (latest sync):
 
 | Area | Kya ship hua |
 |------|----------------|
@@ -18,6 +18,9 @@ Aaj ka major work (yeh sections pehle outdated the — ab sync hain):
 | **Retrain** | Baseline retrain **680** resolved verdicts, **30** features (inkl. `fundingRateRoc` / `oiRoc`). Model version: `baseline_wf_fold3`. Walk-forward AUC weak / unstable (~0.41 avg) — badge pe “experimental”. |
 | **Charts / Analyze UX** | Pivot **support/resistance** overlays (`computeSupportResistanceLevels` → `structure` in analyze JSON). `VerdictCard` + `LiveCandleChart` overhaul; `MlEdgeBadge` on Analyze + Charts. |
 | **Radar News UI** | `NewsFeedList` polish; `/app/radar` pe **News + Events** tabs already live (pehle sirf Dashboard pe the). |
+| **Journal + exit flow** | `Verdict Journal` page (`/app/journal`) live: "Mark as taken", personal stats, and manual `Exit trade` booking via journal/portfolio exit APIs. |
+| **Market regime chip** | Display-only regime detection added (`/api/regime`, `RegimeBadge` in Dashboard + Analyze + Charts). Verdict gating nahi hoti. |
+| **PWA readiness** | Manifest + icons + service worker + `/offline` page + mobile install CTA wired (layout and app shell). |
 | **Artifacts committed** | `ml/models/baseline_classifier.onnx` + `feature_columns.json` + `feature_medians.json` (+ `ml/ort-wasm/`) — joblib/CSV still gitignored. |
 
 **Still true:** ML does **not** gate or rewrite `synthesizeVerdict`. Auth still mock. No paywall.
@@ -37,7 +40,7 @@ Dheerendra Intelligence ek **Next.js** web app hai jo traders ko sirf chart nahi
 5. Backtest track-record + equity simulator; optional Telegram alerts  
 6. Offline ML train → **ONNX live inference (display-only win %)** on Analyze / Charts — verdict logic pe effect nahi
 
-Saath mein: Radar (whales / ETF / liquidations / news / events), Portfolio tracker, Scenarios, Copilot (Gemini preferred).
+Saath mein: Radar (whales / ETF / liquidations / news / events), Portfolio tracker, Journal, Scenarios, Copilot (Gemini preferred), and PWA install/offline support.
 
 **Disclaimer:** Informational tool only — financial advice nahi. Pricing / paywall / tokens nahi. SEC filings / scrape pipeline nahi.
 
@@ -55,13 +58,15 @@ Dheerendra Intelligence ek hi pipeline mein sab jodta hai:
 
 | Layer | Kya milta hai | Status |
 |-------|----------------|--------|
-| **Analyze / Charts / Dashboard** | 4-lane analysis + synthesized trade idea + S/R structure + optional ML edge badge | Shipped |
+| **Analyze / Charts / Dashboard** | 4-lane analysis + synthesized trade idea + S/R structure + optional ML edge badge + display-only regime chip | Shipped |
 | **Radar** | Whales / ETF / liquidations / **news** / **events** (all tabs on `/app/radar` + news/events on Dashboard) | Shipped |
 | **Portfolio** | Spot / long / short holdings in Postgres (`positions`) + live marks + signal hints | Shipped |
+| **Journal** | Taken verdicts log + personal metrics + manual trade exit booking | Shipped |
 | **Backtest** | Verdicts save → resolve → win rate / equity simulator | Shipped |
 | **Alerts** | Verdict + radar-spike → Telegram | Shipped |
 | **Scenarios** | “Agar BTC −10%?” portfolio stress test | Shipped |
 | **Copilot** | Chat + live price + LLM (Gemini / Anthropic) + template fallback | Shipped |
+| **PWA** | Installable app + offline fallback page + SW cache | Shipped |
 | **ML** | Capture → CSV → train → **ONNX display-only inference** on analyze | Stages 1–4 shipped; Stage 4 does **not** change verdict |
 
 ### Stack
@@ -337,6 +342,7 @@ Path alias: `@/*` → `./src/*`.
 | `/` | `src/app/page.tsx` | Marketing: Hero → EarthRadar → Pipeline → Synthesis → Delivery → CopilotMock → RadarDrawer → ScenarioSimulator → FinalCTA → Footer |
 | `/auth/login` | `src/app/auth/login/page.tsx` | Mock sign-in → `/app/dashboard` |
 | `/auth/signup` | `src/app/auth/signup/page.tsx` | Mock signup → `/app/dashboard` |
+| `/offline` | `src/app/offline/page.tsx` | Offline fallback screen (PWA navigation fallback) |
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of service |
 
@@ -355,10 +361,11 @@ Wrapped by `src/app/app/layout.tsx` → `AppShell` sidebar (`src/components/app/
 | `/app/copilot` | Chat UI (Gemini / Claude / template fallback) |
 | `/app/radar` | Whales / ETF / liquidations / **News** / **Events** tabs |
 | `/app/portfolio` | Holdings tracker (spot / long / short) in Postgres |
+| `/app/journal` | Taken verdict journal + personal stats + manual exit |
 | `/app/scenarios` | BTC shock portfolio stress test |
 | `/app/settings` | Telegram + alert prefs via `/api/settings` |
 
-**Nav order:** Dashboard → Analyze → Charts → Backtest → Copilot → Radar → Scenarios → Portfolio → Settings.
+**Nav order:** Dashboard → Analyze → Charts → Backtest → Copilot → Radar → Scenarios → Portfolio → Journal → Settings.
 
 **Auth note:** `/app/*` **ungated** — no `middleware.ts`. Login/signup sirf `localStorage` stub.
 
@@ -479,6 +486,7 @@ Enough history ke baad weights historical lane accuracy se adjust hote hain.
 - Multi-pair analyze / open verdicts overview
 - **News feed** (`/api/radar?type=news`)
 - **Calendar events** (`/api/radar?type=events` — Binance CMS + CoinPaprika)
+- Display-only market regime chip (`/api/regime`)
 - Quick market + signal snapshot
 
 ### 7.2 Analyze (`/app/analyze`)
@@ -486,6 +494,7 @@ Enough history ke baad weights historical lane accuracy se adjust hote hain.
 - User pair + timeframe select karta hai
 - Hook: `useLiveAnalysis` → `GET /api/analyze`
 - 4 lane cards + final Verdict card + **`MlEdgeBadge`** jab `mlEdge` non-null
+- Regime context chip (display-only) for current market structure
 - Same analyze flow Charts ke `VerdictCard` mein reuse
 
 ### 7.3 Charts (`/app/charts`)
@@ -493,6 +502,7 @@ Enough history ke baad weights historical lane accuracy se adjust hote hain.
 - `LiveCandleChart`: pehle REST `/api/klines`, phir Binance WebSocket live updates
 - Pivot **support / resistance** lines from analyze `structure` (`computeSupportResistanceLevels`)
 - Side pe live verdict + price poll + ML edge badge
+- Side panel mein display-only regime chip
 - Selected pair: `localStorage` key `dc_selected_pair` (`tradingview.ts`)
 
 ### 7.4 Radar (`/app/radar` + landing drawer)
@@ -618,6 +628,21 @@ Teen-step pipeline:
 - `/app/*` routes **ungated** hain
 - Sign out = link to `/auth/login` (AppShell `dc_auth` clear nahi karta)
 
+### 7.12 Journal (`/app/journal`)
+
+- Personal trade log for verdicts you explicitly mark as taken
+- Compare **personal** performance vs **system-wide** track-record
+- Supports manual early exit booking (`Exit trade`) at current market mark
+- APIs: `GET /api/journal`, `PATCH /api/journal/[verdictId]`, `POST /api/journal/[verdictId]/exit`
+- Data persists in Postgres (`journal_entries`) when DB configured
+
+### 7.13 PWA (install + offline)
+
+- Manifest + icons (`/icon-192.png`, `/icon-512.png`, maskable icon)
+- Service worker (`public/sw.js`) for app-shell/static caching
+- App shell shows install CTA on supported browsers (`beforeinstallprompt`)
+- Offline fallback route: `/offline`
+
 ---
 
 ## 8. API reference
@@ -630,6 +655,10 @@ Teen-step pipeline:
 | POST | `/api/copilot` | `{ message, model? }` | `{ reply, symbol, price }` |
 | GET | `/api/radar` | `type` = news\|whales\|liquidations\|etf\|events | `{ type, data, source, cached, fetchedAt }` |
 | GET/POST/PATCH/DELETE | `/api/portfolio` | position fields | CRUD on Postgres `positions` + marks / hints |
+| GET | `/api/regime` | `pair`, `timeframe` | Display-only market regime snapshot (`TRENDING` / `CHOPPY`) |
+| GET | `/api/journal` | — | Taken verdict entries + personal journal stats |
+| PATCH | `/api/journal/[verdictId]` | `{ taken, note? }` | Mark/unmark verdict as taken + note updates |
+| POST | `/api/journal/[verdictId]/exit` | optional `{ exitPrice }` | Manual trade exit booking + realized R update |
 | POST | `/api/backtest/simulate` | pair, dateRange, capital, risk, minTier… | Equity curve + trades + metrics |
 | GET | `/api/backtest/track-record` | — | Aggregate WR, lane accuracy, etc. |
 | GET | `/api/scenarios/correlation` | — | `{ matrix, cached, source }` |
@@ -716,6 +745,7 @@ Templates: `.env.example`.
 | Verdicts / backtest history | Postgres via Prisma when `DATABASE_URL` set; else in-memory | Yes with DB; no without |
 | Point-in-time lane features | `verdict_features` (or memory) | Same as verdicts |
 | Portfolio holdings | Postgres `positions` | Yes (requires DB) |
+| Journal entries | Postgres `journal_entries` | Yes (requires DB) |
 | Radar / track-record caches | Upstash or in-memory Map + TTL | Redis yes / memory no |
 | Alert prefs | Upstash / in-memory (`alerts:prefs`) | Redis yes / memory no |
 | Auth stub | `localStorage` `dc_auth` | Browser only |
@@ -731,6 +761,7 @@ Templates: `.env.example`.
 | `Verdict` → `verdicts` | Trade idea: pair, direction, tier, entry/SL/TP, lane biases, outcome |
 | `VerdictFeature` → `verdict_features` | Point-in-time raw lane numerics + whale/liq + meta (ML); 1:1 with verdict |
 | `Position` → `positions` | User holdings for Portfolio Tracker (spot/long/short) |
+| `JournalEntry` → `journal_entries` | User-taken verdict metadata, notes, and manual exits |
 
 **Feature groups on `VerdictFeature`:** technical (EMA/RSI/ATR regime…), flow (OI/funding/ROC…), narrative (F&G…), macro (DXY/SPX/Gold), whale/liq lookback USD fields, meta (tier, lane agreement, hour/day).
 
@@ -743,6 +774,11 @@ Migrations:
 - `add_momentum_roc_features`
 - `add_whale_liquidation_features`
 - `add_positions`
+- `add_journal_entries`
+- `paper_wallet_trading`
+- `journal_manual_exit`
+- `add_position_sl_tp`
+- `add_position_exit_fields`
 
 ---
 
@@ -836,9 +872,12 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 - Backtest track record + equity simulate + dynamic lane weights  
 - Institutional Radar — whales / ETF / liq / **news** / **events** tabs  
 - Portfolio Tracker (Postgres `positions`)  
+- Journal page for taken verdicts + manual exits  
 - Scenarios stress + correlation (localStorage positions — separate from Portfolio)  
 - Copilot Gemini/Claude + template fallback  
 - Settings alert prefs + Telegram (verdict + radar)  
+- PWA install flow + offline fallback  
+- Display-only market regime signal chip  
 - Health endpoint  
 - ML Stages 1–3 offline + **Stage 4 ONNX display-only** (`mlEdge` badge)  
 
@@ -880,7 +919,9 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 | Live candles + S/R | Charts | `/api/klines` + Binance WS + `structure` | `binance`, `analysis/structure` |
 | Market pulse | Radar / Dashboard | `/api/radar` | `radar/*` |
 | Holdings tracker | Portfolio | `/api/portfolio` | `portfolio/*`, Prisma `Position` |
+| Personal trade journal | Journal | `/api/journal`, `/api/journal/[verdictId]/exit` | `journal/*`, Prisma `JournalEntry` |
 | Historical edge | Backtest | `/api/backtest/*` + cron | `backtest/*`, `verdicts/*` |
+| Market regime context | Dashboard / Analyze / Charts | `/api/regime` | `analysis/regime`, `RegimeBadge` |
 | “Agar BTC −10%?” | Scenarios | `/api/scenarios/correlation`, `/api/market` | `scenarios/*` |
 | Ask a question | Copilot | `/api/copilot` | Gemini / Anthropic + template fallback |
 | Alerts | Settings | `/api/settings`, `/api/cron/check-alerts` | `alerts/*` + Telegram |
