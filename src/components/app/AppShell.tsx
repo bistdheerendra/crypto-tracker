@@ -33,6 +33,19 @@ const NAV = [
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
+const MOBILE_TABS = [
+  { href: "/app/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/app/analyze", label: "Analyze", icon: BarChart3 },
+  { href: "/app/charts", label: "Charts", icon: CandlestickChart },
+  { href: "/app/radar", label: "Radar", icon: Radar },
+  { href: "/app/portfolio", label: "Portfolio", icon: Briefcase },
+];
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
@@ -74,11 +87,34 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const pathname = usePathname();
+
+  function triggerTapFeedback() {
+    if ("vibrate" in navigator) {
+      navigator.vibrate(12);
+    }
+  }
 
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+    };
+    const onAppInstalled = () => {
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -88,17 +124,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [menuOpen]);
 
   return (
-    <div className="flex min-h-screen min-h-dvh">
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-bg-secondary/95 backdrop-blur-sm border-b border-white/8">
+    <div className="flex min-h-dvh">
+      <header className="safe-top lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-bg-secondary/95 backdrop-blur-sm border-b border-white/8">
         <BrandLogo href="/" size="sm" variant="stacked" />
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
-          aria-label="Open menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {installPrompt && (
+            <button
+              type="button"
+              onClick={async () => {
+                triggerTapFeedback();
+                await installPrompt.prompt();
+                await installPrompt.userChoice;
+                setInstallPrompt(null);
+              }}
+              className="h-9 rounded-lg border border-accent/30 bg-accent/15 px-3 text-xs font-semibold text-accent transition-colors hover:bg-accent/25"
+            >
+              Install App
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              triggerTapFeedback();
+              setMenuOpen(true);
+            }}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       {menuOpen && (
@@ -110,11 +165,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Close menu"
           />
           <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-bg-secondary border-r border-white/8 flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-white/8 flex items-center justify-between">
+            <div className="safe-top p-5 border-b border-white/8 flex items-center justify-between">
               <BrandLogo href="/" size="sm" variant="stacked" onClick={() => setMenuOpen(false)} />
               <button
                 type="button"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => {
+                  triggerTapFeedback();
+                  setMenuOpen(false);
+                }}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
                 aria-label="Close menu"
               >
@@ -133,9 +191,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <NavLinks />
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0 pt-14 lg:pt-0">
+      <main className="flex-1 overflow-auto min-w-0 pt-16 pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:pt-0 lg:pb-0">
         <div className="mx-auto w-full max-w-[1920px]">{children}</div>
       </main>
+
+      <nav className="safe-bottom lg:hidden fixed left-0 right-0 bottom-0 z-40 border-t border-white/8 bg-bg-secondary/95 backdrop-blur-sm">
+        <div className="grid grid-cols-5 px-2 pt-1.5 pb-2">
+          {MOBILE_TABS.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={triggerTapFeedback}
+                className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg transition-colors ${
+                  active
+                    ? "text-accent bg-accent/10 scale-[1.02] shadow-[0_0_0_1px_rgba(62,166,255,0.25)]"
+                    : "text-text-muted hover:text-text-primary hover:bg-white/5 active:scale-95"
+                }`}
+              >
+                <Icon className={`h-4 w-4 shrink-0 transition-transform ${active ? "-translate-y-0.5" : ""}`} />
+                <span className="text-[10px] font-medium leading-none">{label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
