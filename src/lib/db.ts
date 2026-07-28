@@ -29,7 +29,8 @@ function hasExpectedDelegates(client: any): boolean {
   // After `prisma generate` adds models, Next.js HMR can leave a stale singleton.
   return (
     typeof client?.verdict?.findMany === "function" &&
-    typeof client?.position?.findMany === "function"
+    typeof client?.position?.findMany === "function" &&
+    typeof client?.journalEntry?.findMany === "function"
   );
 }
 

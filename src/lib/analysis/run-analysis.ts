@@ -54,6 +54,8 @@ export type AnalysisResult = {
   };
   /** True when a non-NEUTRAL verdict was persisted. */
   persisted: boolean;
+  /** Soft id of the persisted Verdict row (null when not persisted). */
+  verdictId: string | null;
 };
 
 /**
@@ -173,8 +175,10 @@ export async function runAnalysis(
   });
 
   let persisted = false;
+  let verdictId: string | null = null;
   if (verdict.direction !== "NEUTRAL") {
-    await saveVerdict(verdict, lanes, features);
+    const stored = await saveVerdict(verdict, lanes, features);
+    verdictId = stored.id;
     await invalidateCache("track-record");
     invalidateLaneWeightCache();
     persisted = true;
@@ -206,5 +210,6 @@ export async function runAnalysis(
       stopLoss: "swing-structure",
     },
     persisted,
+    verdictId,
   };
 }

@@ -12,6 +12,7 @@ import {
   Radar,
   FlaskConical,
   Briefcase,
+  BookMarked,
   Settings,
   LogOut,
   Menu,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/app/radar", label: "Radar", icon: Radar },
   { href: "/app/scenarios", label: "Scenarios", icon: FlaskConical },
   { href: "/app/portfolio", label: "Portfolio", icon: Briefcase },
+  { href: "/app/journal", label: "Journal", icon: BookMarked },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

@@ -6,6 +6,7 @@ import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
+import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
 import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export default function AnalyzePage() {
   const [timeframe, setTimeframe] = useState("1h");
   const [lanes, setLanes] = useState<LaneOutput[]>([]);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [verdictId, setVerdictId] = useState<string | null>(null);
   const [mlEdge, setMlEdge] = useState<MlEdgePayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,18 +36,25 @@ export default function AnalyzePage() {
     setLoading(true);
     setError(null);
     setMlEdge(null);
+    setVerdictId(null);
     try {
       const res = await fetch(`/api/analyze?pair=${encodeURIComponent(pair)}&timeframe=${timeframe}`);
       const data = await res.json();
       if (!res.ok) {
         setLanes([]);
         setVerdict(null);
+        setVerdictId(null);
         setMlEdge(null);
         setError(data.error ?? "Analysis failed.");
         return;
       }
       setLanes(data.lanes);
       setVerdict(data.verdict);
+      setVerdictId(
+        typeof data.verdictId === "string" && data.verdictId.trim()
+          ? data.verdictId.trim()
+          : null
+      );
       const edge = data.mlEdge as MlEdgePayload | null | undefined;
       setMlEdge(
         edge &&
@@ -57,6 +66,7 @@ export default function AnalyzePage() {
     } catch {
       setLanes([]);
       setVerdict(null);
+      setVerdictId(null);
       setMlEdge(null);
       setError("Could not reach analysis service.");
     }
@@ -171,6 +181,9 @@ export default function AnalyzePage() {
           </div>
           <p className="text-sm text-text-muted">{verdict.rationale}</p>
           <p className="text-xs text-accent font-mono-data mt-2">Risk:Reward {verdict.riskReward}</p>
+          {verdict.direction !== "NEUTRAL" && (
+            <JournalTakenControl verdictId={verdictId} />
+          )}
         </GlassCard>
       )}
     </div>

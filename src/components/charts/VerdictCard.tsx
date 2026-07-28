@@ -5,6 +5,7 @@ import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
+import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
 import { intervalToApiTimeframe } from "@/lib/tradingview";
 import type { LaneOutput, Verdict } from "@/lib/types";
 import type { ChartLevels } from "@/components/charts/LiveCandleChart";
@@ -73,6 +74,7 @@ export function VerdictCard({
   onAnalysisChange,
 }: VerdictCardProps) {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [verdictId, setVerdictId] = useState<string | null>(null);
   const [lanes, setLanes] = useState<LaneOutput[]>([]);
   const [structure, setStructure] = useState<StructurePayload | null>(null);
   const [mlEdge, setMlEdge] = useState<MlEdgePayload | null>(null);
@@ -92,6 +94,7 @@ export function VerdictCard({
   useEffect(() => {
     requestIdRef.current += 1;
     setVerdict(null);
+    setVerdictId(null);
     setLanes([]);
     setStructure(null);
     setMlEdge(null);
@@ -106,6 +109,7 @@ export function VerdictCard({
     setLoading(true);
     setError(null);
     setMlEdge(null);
+    setVerdictId(null);
     setHasAnalyzed(false);
 
     const timeframe = intervalToApiTimeframe(interval);
@@ -119,6 +123,7 @@ export function VerdictCard({
 
       if (!res.ok) {
         setVerdict(null);
+        setVerdictId(null);
         setLanes([]);
         setStructure(null);
         setMlEdge(null);
@@ -132,8 +137,13 @@ export function VerdictCard({
       const nextLanes = (data.lanes as LaneOutput[] | undefined) ?? [];
       const nextStructure = (data.structure as StructurePayload | undefined) ?? null;
       const edge = data.mlEdge as MlEdgePayload | null | undefined;
+      const nextId =
+        typeof data.verdictId === "string" && data.verdictId.trim()
+          ? data.verdictId.trim()
+          : null;
 
       setVerdict(next);
+      setVerdictId(nextId);
       setLanes(nextLanes);
       setStructure(nextStructure);
       setHasAnalyzed(true);
@@ -151,6 +161,7 @@ export function VerdictCard({
     } catch {
       if (requestId !== requestIdRef.current) return;
       setVerdict(null);
+      setVerdictId(null);
       setLanes([]);
       setStructure(null);
       setMlEdge(null);
@@ -366,6 +377,7 @@ export function VerdictCard({
                 Risk:Reward {verdict.riskReward}
               </p>
             )}
+            {hasTrade && <JournalTakenControl verdictId={verdictId} />}
           </div>
         )}
 

@@ -108,3 +108,14 @@ model Position {
   @@index([assetSymbol])
   @@map("positions")
 }
+
+/// Personal "taken" journal — soft-references Verdict by id (no FK on Verdict).
+/// Existence of a row means the user marked that verdict as taken.
+model JournalEntry {
+  id        String   @id @default(cuid())
+  verdictId String   @unique
+  note      String?
+  takenAt   DateTime @default(now())
+
+  @@map("journal_entries")
+}

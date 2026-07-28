@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       structure: result.structure,
       dataSources: result.dataSources,
       mlEdge,
+      verdictId: result.verdictId,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Analysis failed";
