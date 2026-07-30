@@ -12,7 +12,19 @@ type QueryFilters = {
   to?: Date;
   minTier?: "HIGH" | "MODERATE" | "LOW";
   resolvedOnly?: boolean;
+  /** Default false — feature rows are large; only ML export / rare callers need them. */
+  includeFeatures?: boolean;
 };
+
+type LoadOptions = {
+  includeFeatures?: boolean;
+};
+
+/** Tiers at or above `minTier` (HIGH ⊂ MODERATE ⊂ LOW). */
+function tiersAtOrAbove(minTier: "HIGH" | "MODERATE" | "LOW"): Tier[] {
+  const min = TIER_ORDER[minTier];
+  return (Object.keys(TIER_ORDER) as Tier[]).filter((t) => TIER_ORDER[t] >= min);
+}
 
 function filterVerdicts(list: StoredVerdict[], filters: QueryFilters): StoredVerdict[] {
   const minTierLevel = filters.minTier ? TIER_ORDER[filters.minTier] : 0;
@@ -28,6 +40,28 @@ function filterVerdicts(list: StoredVerdict[], filters: QueryFilters): StoredVer
     }
     return true;
   });
+}
+
+function buildPrismaWhere(filters: QueryFilters): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  if (filters.pair) where.pair = filters.pair;
+  if (filters.from || filters.to) {
+    where.createdAt = {
+      ...(filters.from ? { gte: filters.from } : {}),
+      ...(filters.to ? { lte: filters.to } : {}),
+    };
+  }
+  if (filters.minTier) {
+    where.confidenceTier = { in: tiersAtOrAbove(filters.minTier) };
+  }
+  if (filters.resolvedOnly) {
+    where.AND = [
+      { outcome: { not: null } },
+      { NOT: { outcome: "open" } },
+      { rMultiple: { not: null } },
+    ];
+  }
+  return where;
 }
 
 function rowToStored(row: {
@@ -142,43 +176,57 @@ function rowToStored(row: {
   };
 }
 
-export async function getAllVerdicts(): Promise<StoredVerdict[]> {
+export async function getAllVerdicts(options: LoadOptions = {}): Promise<StoredVerdict[]> {
+  const includeFeatures = options.includeFeatures === true;
   const prisma = getPrisma();
   if (!prisma) return [...memoryVerdicts];
 
   const rows = await prisma.verdict.findMany({
-    include: { features: true },
+    ...(includeFeatures ? { include: { features: true } } : {}),
     orderBy: { createdAt: "asc" },
   });
   return rows.map(rowToStored);
 }
 
-export async function getVerdictById(id: string): Promise<StoredVerdict | undefined> {
+export async function getVerdictById(
+  id: string,
+  options: LoadOptions = {}
+): Promise<StoredVerdict | undefined> {
+  const includeFeatures = options.includeFeatures === true;
   const prisma = getPrisma();
   if (!prisma) return memoryVerdicts.find((v) => v.id === id);
 
   const row = await prisma.verdict.findUnique({
     where: { id },
-    include: { features: true },
+    ...(includeFeatures ? { include: { features: true } } : {}),
   });
   return row ? rowToStored(row) : undefined;
 }
 
-export async function getOpenVerdicts(): Promise<StoredVerdict[]> {
+export async function getOpenVerdicts(options: LoadOptions = {}): Promise<StoredVerdict[]> {
+  const includeFeatures = options.includeFeatures === true;
   const prisma = getPrisma();
   if (!prisma) return memoryVerdicts.filter((v) => v.outcome === "open");
 
   const rows = await prisma.verdict.findMany({
     where: { outcome: "open" },
-    include: { features: true },
+    ...(includeFeatures ? { include: { features: true } } : {}),
     orderBy: { createdAt: "asc" },
   });
   return rows.map(rowToStored);
 }
 
 export async function queryVerdicts(filters: QueryFilters): Promise<StoredVerdict[]> {
-  const all = await getAllVerdicts();
-  return filterVerdicts(all, filters);
+  const includeFeatures = filters.includeFeatures === true;
+  const prisma = getPrisma();
+  if (!prisma) return filterVerdicts(memoryVerdicts, filters);
+
+  const rows = await prisma.verdict.findMany({
+    where: buildPrismaWhere(filters),
+    ...(includeFeatures ? { include: { features: true } } : {}),
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map(rowToStored);
 }
 
 export async function saveVerdict(
@@ -267,10 +315,10 @@ export async function saveVerdict(
           }
         : undefined,
     },
-    include: { features: true },
   });
 
-  return rowToStored(row);
+  // Avoid re-reading VerdictFeature over the wire — we already have the payload.
+  return { ...rowToStored(row), features: features ?? null };
 }
 
 export async function resolveVerdict(
@@ -299,7 +347,6 @@ export async function resolveVerdict(
         outcomeAt: new Date(update.outcomeAt),
         rMultiple: update.rMultiple,
       },
-      include: { features: true },
     });
     return rowToStored(row);
   } catch {

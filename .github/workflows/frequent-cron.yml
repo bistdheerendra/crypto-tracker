@@ -2,15 +2,16 @@ name: Frequent Dheerendra Intelligence crons
 
 # Vercel Hobby cron is daily-only. This workflow densifies track-record + alerts.
 # Secrets: CRON_BASE_URL (https://your-app.vercel.app), CRON_SECRET
+# Prefer cron-job.org for production; keep intervals aligned to limit Supabase egress.
 
 on:
   schedule:
-    # Every 15 minutes — resolve open verdicts
-    - cron: "*/15 * * * *"
+    # Every 30 minutes — resolve open verdicts
+    - cron: "*/30 * * * *"
     # Every 3 hours — generate new verdicts (slower than resolve so open backlog can clear)
     - cron: "5 */3 * * *"
-    # Every 15 minutes offset — radar / telegram alerts
-    - cron: "7,22,37,52 * * * *"
+    # Every 30 minutes offset — radar / telegram alerts
+    - cron: "7,37 * * * *"
   workflow_dispatch:
     inputs:
       job:
@@ -43,9 +44,9 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve verdicts (15m)
+      - name: Resolve verdicts (30m)
         if: >
-          github.event_name == 'schedule' && github.event.schedule == '*/15 * * * *'
+          github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *'
           || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'resolve'))
         env:
           CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}
@@ -81,7 +82,7 @@ jobs:
 
       - name: Check alerts (radar spikes)
         if: >
-          github.event_name == 'schedule' && github.event.schedule == '7,22,37,52 * * * *'
+          github.event_name == 'schedule' && github.event.schedule == '7,37 * * * *'
           || (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'alerts'))
         env:
           CRON_BASE_URL: ${{ secrets.CRON_BASE_URL }}

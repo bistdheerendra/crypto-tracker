@@ -8,9 +8,12 @@ needs more frequent hits — use **GitHub Actions** (this repo) and/or
 
 | Job | Path | Interval |
 |-----|------|----------|
-| Resolve open verdicts | `/api/cron/resolve-verdicts` | every **15 min** |
+| Resolve open verdicts | `/api/cron/resolve-verdicts` | every **30 min** |
 | Generate new verdicts | `/api/cron/generate-verdicts` | every **3 hours** |
-| Radar → Telegram alerts | `/api/cron/check-alerts` | every **10–15 min** |
+| Radar → Telegram alerts | `/api/cron/check-alerts` | every **30 min** |
+
+Intervals are tuned to stay within Supabase Free-plan egress (5 GB/month).
+Do **not** run both GitHub Actions and cron-job.org for the same path — pick one.
 
 All routes accept `GET` or `POST` and optional auth:
 
@@ -35,9 +38,9 @@ Enable Actions on the repo; the workflow runs on schedule automatically.
 
 Create 3 jobs pointing at production:
 
-1. `GET https://<domain>/api/cron/resolve-verdicts` — every 15 minutes  
+1. `GET https://<domain>/api/cron/resolve-verdicts` — every 30 minutes  
 2. `GET https://<domain>/api/cron/generate-verdicts` — every 3 hours  
-3. `GET https://<domain>/api/cron/check-alerts` — every 10–15 minutes  
+3. `GET https://<domain>/api/cron/check-alerts` — every 30 minutes  
 
 Header: `Authorization: Bearer <CRON_SECRET>`
 
