@@ -31,7 +31,9 @@ function hasExpectedDelegates(client: any): boolean {
     typeof client?.verdict?.findMany === "function" &&
     typeof client?.position?.findMany === "function" &&
     typeof client?.journalEntry?.findMany === "function" &&
-    typeof client?.paperWallet?.findMany === "function"
+    typeof client?.paperWallet?.findMany === "function" &&
+    typeof client?.regimeSnapshot?.create === "function" &&
+    typeof client?.laneHealthLog?.createMany === "function"
   );
 }
 

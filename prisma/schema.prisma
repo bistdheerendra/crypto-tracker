@@ -139,3 +139,30 @@ model JournalEntry {
 
   @@map("journal_entries")
 }
+
+model RegimeSnapshot {
+  id              String   @id @default(cuid())
+  pair            String
+  timeframe       String
+  regime          String // "TRENDING" | "CHOPPY"
+  volatilityRatio Float
+  rangeBoundPct   Float
+  computedAt      DateTime @default(now())
+
+  @@index([pair, computedAt])
+  @@map("regime_snapshots")
+}
+
+model LaneHealthLog {
+  id          String   @id @default(cuid())
+  pair        String
+  timeframe   String
+  lane        String // "technical" | "flow" | "narrative" | "macro"
+  status      String // "ok" | "degraded" | "failed"
+  source      String? // e.g. "binance" | "bybit" | "okx" | "coingecko"
+  errorDetail String? // short error message/status code if failed
+  recordedAt  DateTime @default(now())
+
+  @@index([pair, recordedAt])
+  @@map("lane_health_logs")
+}

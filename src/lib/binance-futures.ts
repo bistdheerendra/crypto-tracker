@@ -14,6 +14,34 @@ const FUTURES_API = "https://fapi.binance.com/fapi/v1";
 const FUTURES_DATA = "https://fapi.binance.com/futures/data";
 const FUTURES_TIMEOUT_MS = 5000;
 
+/** Skip Binance Futures after HTTP 451 (geo-block) — common on some Vercel regions. */
+const REGION_BLOCK_TTL_MS = 30 * 60 * 1000;
+let regionBlockedUntil = 0;
+
+export function isBinanceFuturesRegionBlocked(): boolean {
+  return Date.now() < regionBlockedUntil;
+}
+
+function markBinanceFuturesRegionBlocked(status: number | null): void {
+  if (status !== 451) return;
+  regionBlockedUntil = Date.now() + REGION_BLOCK_TTL_MS;
+  console.warn(
+    "[binance-futures] region-blocked (451) — skipping venue for 30m; OKX/Bybit remain"
+  );
+}
+
+function unavailableFlow(): FlowMetrics {
+  return {
+    openInterest: 0,
+    oiChange24hPct: 0,
+    oiRoc: null,
+    fundingRate: 0,
+    fundingRateRoc: null,
+    longShortRatio: 1,
+    available: false,
+  };
+}
+
 type FuturesFetchResult =
   | { ok: true; data: unknown }
   | { ok: false; status: number | null; body: string; error: string };
@@ -120,6 +148,10 @@ function computeFundingRateRoc(
 }
 
 export async function getBinanceFlowMetrics(symbol: string): Promise<FlowMetrics> {
+  if (isBinanceFuturesRegionBlocked()) {
+    return unavailableFlow();
+  }
+
   const pair = symbol.replace("/", "");
   const endpoints = {
     openInterest: `${FUTURES_API}/openInterest?symbol=${pair}`,
@@ -156,6 +188,7 @@ export async function getBinanceFlowMetrics(symbol: string): Promise<FlowMetrics
     ) {
       for (const [name, result] of failed) {
         if (result.ok) continue;
+        markBinanceFuturesRegionBlocked(result.status);
         console.error("[binance-futures] endpoint failed", {
           symbol: pair,
           endpoint: name,
@@ -165,15 +198,7 @@ export async function getBinanceFlowMetrics(symbol: string): Promise<FlowMetrics
           body: result.body || undefined,
         });
       }
-      return {
-        openInterest: 0,
-        oiChange24hPct: 0,
-        oiRoc: null,
-        fundingRate: 0,
-        fundingRateRoc: null,
-        longShortRatio: 1,
-        available: false,
-      };
+      return unavailableFlow();
     }
 
     const oiRes = oiResult.data;
@@ -243,14 +268,6 @@ export async function getBinanceFlowMetrics(symbol: string): Promise<FlowMetrics
       error: err instanceof Error ? err.message : String(err),
       stack: err instanceof Error ? err.stack : undefined,
     });
-    return {
-      openInterest: 0,
-      oiChange24hPct: 0,
-      oiRoc: null,
-      fundingRate: 0,
-      fundingRateRoc: null,
-      longShortRatio: 1,
-      available: false,
-    };
+    return unavailableFlow();
   }
 }

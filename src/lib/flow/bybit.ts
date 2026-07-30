@@ -1,7 +1,26 @@
 import type { FlowMetrics } from "@/lib/binance-futures";
-import { fetchJsonWithTimeout } from "@/lib/fetch-utils";
+import {
+  fetchJsonWithTimeout,
+  HttpFetchError,
+} from "@/lib/fetch-utils";
 
 type PartialFlow = Partial<FlowMetrics> & { available: boolean };
+
+/** Skip Bybit after HTTP 403 (geo/WAF) — common on some Vercel regions. */
+const BLOCK_TTL_MS = 30 * 60 * 1000;
+let blockedUntil = 0;
+
+export function isBybitFlowBlocked(): boolean {
+  return Date.now() < blockedUntil;
+}
+
+function markBybitBlocked(status: number | null): void {
+  if (status !== 403) return;
+  blockedUntil = Date.now() + BLOCK_TTL_MS;
+  console.warn(
+    "[bybit-flow] blocked (403) — skipping venue for 30m; OKX/Binance remain"
+  );
+}
 
 function toBybitSymbol(pair: string): string {
   return pair.replace("/", "").toUpperCase();
@@ -11,6 +30,10 @@ function toBybitSymbol(pair: string): string {
  * Bybit linear perpetual OI + funding (+ account long/short when available).
  */
 export async function getBybitFlowMetrics(pair: string): Promise<PartialFlow> {
+  if (isBybitFlowBlocked()) {
+    return { available: false };
+  }
+
   const symbol = toBybitSymbol(pair);
   try {
     const [oiRes, fundRes, ratioRes] = await Promise.all([
@@ -93,6 +116,8 @@ export async function getBybitFlowMetrics(pair: string): Promise<PartialFlow> {
       available: true,
     };
   } catch (err) {
+    const status = err instanceof HttpFetchError ? err.status : null;
+    markBybitBlocked(status);
     console.warn(
       "[bybit-flow]",
       symbol,

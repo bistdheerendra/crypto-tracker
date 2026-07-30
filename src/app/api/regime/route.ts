@@ -5,6 +5,7 @@ import {
   detectMarketRegime,
   type MarketRegimeResult,
 } from "@/lib/analysis/regime";
+import { recordRegimeSnapshot } from "@/lib/instrumentation/regime-snapshot";
 import { getRadarCache, setRadarCache } from "@/lib/radar/utils";
 
 /** Regime is slow-moving; 90s keeps load light without feeling stale. */
@@ -52,6 +53,9 @@ export async function GET(req: NextRequest) {
     const payload: RegimePayload = { pair, timeframe, ...result };
     const fetchedAt = Date.now();
     await setRadarCache(cacheKey, payload, REGIME_CACHE_TTL_MS);
+
+    // Instrumentation only — never blocks / alters the API response.
+    recordRegimeSnapshot(pair, timeframe, result);
 
     return NextResponse.json({
       ...payload,

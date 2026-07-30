@@ -55,6 +55,10 @@ export async function getOkxFlowMetrics(pair: string): Promise<PartialFlow> {
     ]);
 
     if (oiRes.code !== "0" || !oiRes.data?.[0]) {
+      console.warn("[okx-flow] open-interest unavailable", {
+        instId,
+        code: oiRes.code,
+      });
       return { available: false };
     }
 

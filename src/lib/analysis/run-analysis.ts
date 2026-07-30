@@ -24,6 +24,10 @@ import {
 import { invalidateCache } from "@/lib/backtest/cache";
 import { invalidateLaneWeightCache } from "@/lib/backtest/lane-weights";
 import {
+  buildLaneHealthFromAnalysis,
+  recordLaneHealthLogs,
+} from "@/lib/instrumentation/lane-health";
+import {
   buildVerdictFeatures,
   type FlowRawFeatures,
   type MacroRawFeatures,
@@ -193,22 +197,37 @@ export async function runAnalysis(
       });
   }
 
+  const dataSources = {
+    klines: "binance",
+    price: "binance",
+    flow: flow.available ? formatFlowSources(flow.sources) : "unavailable",
+    narrative: narrative.available
+      ? "alternative.me+coingecko+binance"
+      : "unavailable",
+    macro: macro.available ? "yahoo-finance" : "unavailable",
+    stopLoss: "swing-structure",
+  };
+
+  // Instrumentation only — never blocks analyze / verdict persistence.
+  recordLaneHealthLogs(
+    pair,
+    timeframe,
+    buildLaneHealthFromAnalysis({
+      dataSources,
+      flowAvailable: flow.available,
+      narrativeAvailable: narrative.available,
+      narrativeMcapOk: narrative.globalMarketCapChange24hPct != null,
+      macroAvailable: macro.available,
+    })
+  );
+
   return {
     lanes,
     verdict,
     price,
     structure,
     features,
-    dataSources: {
-      klines: "binance",
-      price: "binance",
-      flow: flow.available ? formatFlowSources(flow.sources) : "unavailable",
-      narrative: narrative.available
-        ? "alternative.me+coingecko+binance"
-        : "unavailable",
-      macro: macro.available ? "yahoo-finance" : "unavailable",
-      stopLoss: "swing-structure",
-    },
+    dataSources,
     persisted,
     verdictId,
   };

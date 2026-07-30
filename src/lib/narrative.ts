@@ -30,12 +30,29 @@ type FearGreedEntry = {
 };
 
 /** Global mcap / trending change slowly — share across concurrent analyze jobs. */
-const COINGECKO_CACHE_TTL_MS = 10 * 60 * 1000;
+const COINGECKO_CACHE_TTL_MS = 30 * 60 * 1000;
+/** After a hard failure, briefly cache empty so a cron batch can't stampede again. */
+const COINGECKO_NEGATIVE_CACHE_TTL_MS = 90 * 1000;
 const GLOBAL_MCAP_CACHE_KEY = "narrative:coingecko:global-mcap-change";
 const TRENDING_CACHE_KEY = "narrative:coingecko:trending-symbols";
 
+/** In-flight coalescing — concurrent callers share one CoinGecko fetch. */
+const inflight = new Map<string, Promise<unknown>>();
+
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableCoinGeckoError(err: unknown): boolean {
+  if (err instanceof HttpFetchError) {
+    return err.status === 429 || err.status === 503 || err.status >= 500;
+  }
+  const details = fetchErrorDetails(err);
+  if (details.status === 429 || details.status === 503) return true;
+  return (
+    details.error === "Timeout / AbortError" ||
+    /HTTP 429|HTTP 503|Timeout/i.test(details.error)
+  );
 }
 
 async function fetchCoinGeckoJsonWithRetry<T>(
@@ -46,26 +63,66 @@ async function fetchCoinGeckoJsonWithRetry<T>(
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await fetchJsonWithTimeout<T>(url, 4000);
+      return await fetchJsonWithTimeout<T>(url, 6000);
     } catch (err) {
       lastErr = err;
       const details = fetchErrorDetails(err);
-      const is429 =
-        err instanceof HttpFetchError
-          ? err.status === 429
-          : details.status === 429 || /HTTP 429/.test(details.error);
       console.error(`[narrative] ${label} failed (attempt ${i + 1}/${attempts})`, {
         url,
         status: details.status,
         error: details.error,
         body: details.body,
       });
-      if (!is429 || i === attempts - 1) break;
-      // 1s, 2s backoff for transient CoinGecko free-tier 429s
+      if (!isRetryableCoinGeckoError(err) || i === attempts - 1) break;
+      // 1s, 2s backoff for transient CoinGecko free-tier 429s / timeouts
       await sleep(1000 * (i + 1));
     }
   }
   throw lastErr;
+}
+
+/**
+ * Cache + single-flight wrapper so pair×timeframe cron batches share one
+ * CoinGecko round-trip instead of N parallel free-tier hits.
+ */
+async function withCoinGeckoCache<T>(
+  cacheKey: string,
+  label: string,
+  fetchValue: () => Promise<T>,
+  emptyOnFail: T
+): Promise<T> {
+  const cached = await getRadarCache<T>(cacheKey);
+  if (cached) {
+    return cached.data;
+  }
+
+  const existing = inflight.get(cacheKey) as Promise<T> | undefined;
+  if (existing) {
+    return existing;
+  }
+
+  const promise = (async () => {
+    try {
+      const value = await fetchValue();
+      await setRadarCache(cacheKey, value, COINGECKO_CACHE_TTL_MS);
+      return value;
+    } catch (err) {
+      const details = fetchErrorDetails(err);
+      console.error(`[narrative] ${label} exhausted retries`, {
+        status: details.status,
+        error: details.error,
+        body: details.body,
+      });
+      // Negative-cache briefly so the rest of a concurrent batch doesn't re-stampede.
+      await setRadarCache(cacheKey, emptyOnFail, COINGECKO_NEGATIVE_CACHE_TTL_MS);
+      return emptyOnFail;
+    } finally {
+      inflight.delete(cacheKey);
+    }
+  })();
+
+  inflight.set(cacheKey, promise);
+  return promise;
 }
 
 async function getFearGreed(): Promise<{
@@ -120,65 +177,44 @@ async function getFearGreed(): Promise<{
 }
 
 async function getGlobalMarketCapChange(): Promise<number | null> {
-  const cached = await getRadarCache<number | null>(GLOBAL_MCAP_CACHE_KEY);
-  if (cached) {
-    return cached.data;
-  }
-
-  const url = "https://api.coingecko.com/api/v3/global";
-  try {
-    const data = await fetchCoinGeckoJsonWithRetry<{
-      data?: { market_cap_change_percentage_24h_usd?: number };
-    }>(url, "getGlobalMarketCapChange");
-    const change = data?.data?.market_cap_change_percentage_24h_usd;
-    if (typeof change !== "number") {
-      console.error("[narrative] getGlobalMarketCapChange: unexpected payload", {
-        status: 200,
-        body: JSON.stringify(data).slice(0, 500),
-      });
-      return null;
-    }
-    await setRadarCache(GLOBAL_MCAP_CACHE_KEY, change, COINGECKO_CACHE_TTL_MS);
-    return change;
-  } catch (err) {
-    const details = fetchErrorDetails(err);
-    console.error("[narrative] getGlobalMarketCapChange exhausted retries", {
-      url,
-      status: details.status,
-      error: details.error,
-      body: details.body,
-    });
-    return null;
-  }
+  return withCoinGeckoCache(
+    GLOBAL_MCAP_CACHE_KEY,
+    "getGlobalMarketCapChange",
+    async () => {
+      const url = "https://api.coingecko.com/api/v3/global";
+      const data = await fetchCoinGeckoJsonWithRetry<{
+        data?: { market_cap_change_percentage_24h_usd?: number };
+      }>(url, "getGlobalMarketCapChange");
+      const change = data?.data?.market_cap_change_percentage_24h_usd;
+      if (typeof change !== "number") {
+        console.error("[narrative] getGlobalMarketCapChange: unexpected payload", {
+          status: 200,
+          body: JSON.stringify(data).slice(0, 500),
+        });
+        throw new Error("unexpected CoinGecko global payload");
+      }
+      return change;
+    },
+    null
+  );
 }
 
 async function getTrendingCoins(): Promise<string[]> {
-  const cached = await getRadarCache<string[]>(TRENDING_CACHE_KEY);
-  if (cached) {
-    return cached.data;
-  }
-
-  const url = "https://api.coingecko.com/api/v3/search/trending";
-  try {
-    const data = await fetchCoinGeckoJsonWithRetry<{
-      coins?: { item?: { symbol?: string } }[];
-    }>(url, "getTrendingCoins");
-    const coins = (data?.coins ?? [])
-      .slice(0, 3)
-      .map((c) => String(c.item?.symbol ?? "").toUpperCase())
-      .filter(Boolean);
-    await setRadarCache(TRENDING_CACHE_KEY, coins, COINGECKO_CACHE_TTL_MS);
-    return coins;
-  } catch (err) {
-    const details = fetchErrorDetails(err);
-    console.error("[narrative] getTrendingCoins exhausted retries", {
-      url,
-      status: details.status,
-      error: details.error,
-      body: details.body,
-    });
-    return [];
-  }
+  return withCoinGeckoCache(
+    TRENDING_CACHE_KEY,
+    "getTrendingCoins",
+    async () => {
+      const url = "https://api.coingecko.com/api/v3/search/trending";
+      const data = await fetchCoinGeckoJsonWithRetry<{
+        coins?: { item?: { symbol?: string } }[];
+      }>(url, "getTrendingCoins");
+      return (data?.coins ?? [])
+        .slice(0, 3)
+        .map((c) => String(c.item?.symbol ?? "").toUpperCase())
+        .filter(Boolean);
+    },
+    []
+  );
 }
 
 export async function getNarrativeSnapshot(symbol: string): Promise<NarrativeSnapshot> {
