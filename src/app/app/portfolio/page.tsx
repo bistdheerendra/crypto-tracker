@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
+import { AiLoader } from "@/components/ui/AiLoader";
 import { TRACKED_PAIRS } from "@/lib/market/constants";
 import { Loader2, Plus, Pencil, Trash2, X } from "lucide-react";
 import type { PaperWallet, PositionRow, SignalHint } from "@/lib/portfolio/types";
@@ -431,9 +432,8 @@ export default function PortfolioPage() {
 
       <GlassCard className="!p-0 overflow-hidden">
         {loading ? (
-          <div className="flex items-center gap-2 p-6 text-text-muted text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading positions…
+          <div className="min-h-[14rem] flex items-center justify-center">
+            <AiLoader size="md" label="Loading portfolio…" cycleSteps={false} className="w-full" />
           </div>
         ) : positions.length === 0 ? (
           <p className="py-8 px-4 text-center text-text-muted text-sm">

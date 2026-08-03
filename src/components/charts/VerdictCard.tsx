@@ -6,6 +6,7 @@ import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
 import { RegimeBadge } from "@/components/ui/RegimeBadge";
+import { AiLoader } from "@/components/ui/AiLoader";
 import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
 import { useMarketRegime } from "@/components/regime/useMarketRegime";
 import { intervalToApiTimeframe } from "@/lib/tradingview";
@@ -114,7 +115,11 @@ export function VerdictCard({
     setError(null);
     setMlEdge(null);
     setVerdictId(null);
+    setVerdict(null);
+    setLanes([]);
+    setStructure(null);
     setHasAnalyzed(false);
+    onAnalysisChangeRef.current?.({ verdict: null, levels: null });
 
     const timeframe = intervalToApiTimeframe(interval);
 
@@ -206,8 +211,14 @@ export function VerdictCard({
             type="button"
             onClick={() => void runAnalysis()}
             disabled={loading}
-            className="px-3 py-1.5 bg-accent text-bg-primary rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-accent text-bg-primary rounded-lg text-xs font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50"
           >
+            {loading && (
+              <span
+                className="inline-block w-3 h-3 rounded-full border-2 border-bg-primary/30 border-t-bg-primary animate-spin"
+                aria-hidden
+              />
+            )}
             {loading ? "Analyzing…" : "Analyzer"}
           </button>
         </div>
@@ -237,9 +248,8 @@ export function VerdictCard({
 
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
         {loading && (
-          <div className="space-y-3 mb-4">
-            <div className="skeleton h-24" />
-            <div className="skeleton h-32" />
+          <div className="min-h-[14rem] flex items-center justify-center rounded-lg border border-accent/20 bg-accent/5">
+            <AiLoader size="md" className="w-full" />
           </div>
         )}
 

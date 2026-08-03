@@ -12,7 +12,7 @@ import {
   type JournalVerdictSummary,
 } from "@/lib/journal/types";
 import type { Tier } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { AiLoader } from "@/components/ui/AiLoader";
 
 function outcomeLabel(
   entry: JournalEntryRow,
@@ -192,10 +192,9 @@ export default function JournalPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-text-muted text-sm mb-8">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading journal…
-        </div>
+        <GlassCard className="min-h-[14rem] flex items-center justify-center mb-8">
+          <AiLoader size="md" label="Loading journal…" cycleSteps={false} className="w-full" />
+        </GlassCard>
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

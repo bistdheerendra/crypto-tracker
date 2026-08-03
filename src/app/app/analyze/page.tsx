@@ -6,6 +6,7 @@ import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
 import { MlEdgeBadge } from "@/components/ui/MlEdgeBadge";
 import { RegimeBadge } from "@/components/ui/RegimeBadge";
+import { AiLoader } from "@/components/ui/AiLoader";
 import { CoinIcon, pairBaseSymbol } from "@/components/ui/CoinIcon";
 import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
 import { useMarketRegime } from "@/components/regime/useMarketRegime";
@@ -147,9 +148,13 @@ export default function AnalyzePage() {
             </ul>
           </GlassCard>
         ))}
-        {loading && lanes.length === 0 && Array.from({ length: 4 }).map((_, i) => (
-          <GlassCard key={i}><div className="skeleton h-32" /></GlassCard>
-        ))}
+        {loading && lanes.length === 0 && (
+          <div className="col-span-full">
+            <GlassCard className="p-2!">
+              <AiLoader size="lg" />
+            </GlassCard>
+          </div>
+        )}
       </div>
 
       {verdict && (
