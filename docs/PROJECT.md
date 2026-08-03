@@ -7,7 +7,7 @@
 
 ---
 
-## Changelog — 28 Jul 2026 (share with Claude)
+## Changelog — 3 Aug 2026 (share with Claude)
 
 Aaj tak ka major work (latest sync):
 
@@ -15,7 +15,7 @@ Aaj tak ka major work (latest sync):
 |------|----------------|
 | **ML Stage 4 — live edge (display-only)** | Non-NEUTRAL `/api/analyze` ab `mlEdge: { winProbability, modelVersion }` return karta hai. ONNX in-process (`onnxruntime-web` + shipped WASM under `ml/ort-wasm/`). **Direction / SL / TP change nahi hote** — sirf UI badge. Score DB mein persist **nahi**. |
 | **Vercel ML path** | `next.config.ts` `outputFileTracingIncludes` for `/api/analyze` (ONNX + sidecars + WASM). Python spawn Vercel pe skip; local optional fallback. |
-| **Retrain** | Baseline retrain **680** resolved verdicts, **30** features (inkl. `fundingRateRoc` / `oiRoc`). Model version: `baseline_wf_fold3`. Walk-forward AUC weak / unstable (~0.41 avg) — badge pe “experimental”. |
+| **Retrain** | Baseline retrain **2874** resolved verdicts (Jul 21 → Aug 3), **31** features. Model version: `baseline_wf_fold3`. Walk-forward avg AUC **~0.70** (folds 0.66 / 0.82 / 0.61) — ranking better than prior ~0.41, but win precision ~0.24 ≈ base rate 22%; fold 2 nearly winless (5.2% WR). Badge pe “experimental”. |
 | **Charts / Analyze UX** | Pivot **support/resistance** overlays (`computeSupportResistanceLevels` → `structure` in analyze JSON). `VerdictCard` + `LiveCandleChart` overhaul; `MlEdgeBadge` on Analyze + Charts. |
 | **Radar News UI** | `NewsFeedList` polish; `/app/radar` pe **News + Events** tabs already live (pehle sirf Dashboard pe the). |
 | **Journal + exit flow** | `Verdict Journal` page (`/app/journal`) live: "Mark as taken", personal stats, and manual `Exit trade` booking via journal/portfolio exit APIs. |
@@ -188,10 +188,10 @@ sequenceDiagram
 |-------|-----|--------|
 | **1 — Capture** | Analyze time pe `VerdictFeature` (lanes + whale/liq + meta) | Done — live |
 | **2 — Extract** | `npm run extract-training-data` → `ml/data/training_dataset.csv` | Done |
-| **3 — Train + export** | `npm run train-model` → joblib; `python ml/export_onnx.py` → ONNX + medians + columns | Done (baseline, 680 rows / 30 feats) |
+| **3 — Train + export** | `npm run train-model` → joblib; `python ml/export_onnx.py` → ONNX + medians + columns | Done (baseline, 2874 rows / 31 feats) |
 | **4 — Inference** | `GET /api/analyze` → `getMlEdge()` → `mlEdge` badge on Analyze / Charts | Done — **display only**; never writes DB; never changes direction/SL/TP |
 
-Artifacts: ONNX + `feature_columns.json` + `feature_medians.json` + WASM **committed** (Vercel needs them). Joblib + CSV **gitignored**. Baseline metrics weak / fold-unstable — product gate nahi.
+Artifacts: ONNX + `feature_columns.json` + `feature_medians.json` + WASM **committed** (Vercel needs them). Joblib + CSV **gitignored**. Baseline ranking improved (avg AUC ~0.70) but precision ≈ base rate / fold-unstable — product gate nahi.
 
 ---
 
@@ -567,12 +567,12 @@ Teen-step pipeline:
 
 **Live path (Stage 4):**
 1. Non-NEUTRAL verdict + features available  
-2. `buildMlFeatureVector()` — same 30-column encoding as training (`encoding.ts` / `feature_columns.json`)  
+2. `buildMlFeatureVector()` — same column encoding as training (`encoding.ts` / `feature_columns.json`, currently 31 feats)  
 3. `getMlEdge()` — primary: ONNX via `onnxruntime-web` + local WASM (`ml/ort-wasm/`); optional local Python `ml/predict.py` spawn; Vercel pe Python skip  
-4. UI: `MlEdgeBadge` on Analyze + Charts — **experimental**; tooltip notes weak walk-forward AUC  
+4. UI: `MlEdgeBadge` on Analyze + Charts — **experimental**; tooltip notes walk-forward variance / not a gate  
 5. **Never persisted**; **never** fed into `synthesizeVerdict` / SL-TP
 
-**Current baseline (retrain 24 Jul 2026):** ~680 resolved rows, 30 features, modelVersion `baseline_wf_fold3`, avg ROC-AUC ~0.41 (unstable across folds). Not a trading gate.
+**Current baseline (retrain 3 Aug 2026):** 2874 resolved rows, 31 features, modelVersion `baseline_wf_fold3`, avg ROC-AUC ~0.70 (folds ~0.66 / 0.82 / 0.61). Win precision ~0.24 ≈ base WR 22.1%. Fold 2 (Jul 25–29) was a wipeout window (~5% WR) — high AUC there is not actionable precision. Top feature: `distanceToNearestSwingPct`. Whale/liq columns dropped (>30% null). Not a trading gate.
 
 **Vercel:** `next.config.ts` traces ONNX + sidecars + WASM into `/api/analyze` serverless bundle. `serverExternalPackages: ["onnxruntime-web"]`.
 
@@ -886,7 +886,7 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 | Item | Reality |
 |------|---------|
 | **ML gates / rewrites verdict** | Score is **display-only**; `synthesizeVerdict` unchanged |
-| **Strong ML edge** | Retrained on 680 rows; walk-forward AUC weak / unstable — not a product gate |
+| **Strong ML edge** | Retrained on 2874 rows; avg AUC ~0.70 but precision ≈ base rate and folds unstable — not a product gate |
 | **Real auth / user accounts** | Mock `localStorage` only |
 | **SEC filings / scrape pipelines** | Absent by design so far |
 | **Paywall / multi-tenant** | None |
@@ -942,4 +942,4 @@ Bina real `DATABASE_URL` ke app chalega; verdicts memory mein rahenge (restart p
 
 ---
 
-*Last updated: **24 Jul 2026** — ML Stage 4 ONNX display-only edge live on Analyze/Charts; retrain 680 verdicts / 30 features; chart S/R overlays; Radar News+Events tabs; Portfolio tracker. Verdict synthesis still rule-based (ML does not rewrite direction/SL/TP). Jab APIs, storage, lane logic, ya cron change ho — is file ko sync rakho.*
+*Last updated: **3 Aug 2026** — ML Stage 4 ONNX display-only edge live on Analyze/Charts; retrain 2874 verdicts / 31 features (avg WF AUC ~0.70, precision still ≈ base rate); chart S/R overlays; Radar News+Events tabs; Portfolio tracker. Verdict synthesis still rule-based (ML does not rewrite direction/SL/TP). Jab APIs, storage, lane logic, ya cron change ho — is file ko sync rakho.*

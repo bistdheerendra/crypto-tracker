@@ -18,6 +18,7 @@
     "fundingRateRoc",
     "oiRoc",
     "fearGreedIndex",
+    "globalMcapChangePct",
     "trendingScore",
     "fearGreedRoc",
     "dxyChangePct",

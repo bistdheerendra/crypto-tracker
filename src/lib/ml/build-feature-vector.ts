@@ -40,6 +40,7 @@ export function buildMlFeatureVector(
     fundingRateRoc: features.fundingRateRoc,
     oiRoc: features.oiRoc,
     fearGreedIndex: features.fearGreedIndex,
+    globalMcapChangePct: features.globalMcapChangePct,
     trendingScore: features.trendingScore,
     fearGreedRoc: features.fearGreedRoc,
     dxyChangePct: features.dxyChangePct,
