@@ -24,6 +24,8 @@
     "dxyChangePct",
     "spxChangePct",
     "goldChangePct",
+    "liquidationNetImbalanceUsd",
+    "liquidationVolumeUsd",
     "laneAgreementCount",
     "pair_BNB_USDT",
     "pair_BTC_USDT",
