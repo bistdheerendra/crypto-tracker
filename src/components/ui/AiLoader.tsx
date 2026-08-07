@@ -85,7 +85,7 @@ export function AiLoader({
       />
 
       <p
-        className={`${s.eyebrow} uppercase tracking-[0.28em] text-accent/80 font-medium`}
+        className={`${s.eyebrow} uppercase tracking-[0.28em] text-accent font-semibold`}
       >
         AI Pipeline
       </p>
@@ -96,10 +96,10 @@ export function AiLoader({
         aria-hidden
       >
         {/* Soft bloom */}
-        <div className="absolute inset-[12%] rounded-full bg-accent/10 blur-2xl ai-bloom" />
+        <div className="absolute inset-[12%] rounded-full bg-accent/25 blur-2xl ai-bloom" />
 
         {/* Outer dashed scan ring */}
-        <div className="absolute inset-0 rounded-full border border-dashed border-accent/25 ai-scan-ring" />
+        <div className="absolute inset-0 rounded-full border border-dashed border-accent/50 ai-scan-ring" />
 
         {/* Mid solid glow ring */}
         <div className="absolute inset-[10%] rounded-full ai-glow-ring" />
@@ -127,13 +127,14 @@ export function AiLoader({
               y2="10"
               gradientUnits="userSpaceOnUse"
             >
-              <stop stopColor="#3ea6ff" />
-              <stop offset="0.55" stopColor="#5bc4ff" />
-              <stop offset="1" stopColor="#2ee6a8" />
+              <stop stopColor="#d1ff45" />
+              <stop offset="0.5" stopColor="#e8ff8a" />
+              <stop offset="1" stopColor="#d1ff45" />
             </linearGradient>
-            <filter id={`ai-glow-${uid}`} x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="1.2" result="b" />
+            <filter id={`ai-glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="2" result="b" />
               <feMerge>
+                <feMergeNode in="b" />
                 <feMergeNode in="b" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
@@ -143,8 +144,8 @@ export function AiLoader({
           {/* Network links */}
           <g
             stroke={`url(#ai-grad-${uid})`}
-            strokeWidth="0.9"
-            opacity="0.45"
+            strokeWidth="1.1"
+            opacity="0.85"
             className="ai-links"
           >
             <line x1="50" y1="22" x2="28" y2="42" />
@@ -219,9 +220,9 @@ export function AiLoader({
               key={step}
               className={`h-1 rounded-full transition-all duration-300 ${
                 i === stepIndex
-                  ? "w-5 bg-gradient-to-r from-accent to-bull"
+                  ? "w-5 bg-gradient-to-r from-accent to-[#e8ff8a]"
                   : i < stepIndex
-                    ? "w-2.5 bg-accent/40"
+                    ? "w-2.5 bg-accent/60"
                     : "w-2.5 bg-white/10"
               }`}
             />

@@ -9,7 +9,7 @@ export function Hero() {
     <section id="hero" className="relative min-h-screen min-h-dvh flex flex-col items-center justify-center px-4 sm:px-6 pt-28 pb-12 lg:pt-0 overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(62,166,255,0.08)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(209,255,69,0.08)_0%,transparent_70%)]" />
         {Array.from({ length: 40 }).map((_, i) => (
           <div
             key={i}
@@ -22,9 +22,9 @@ export function Hero() {
           />
         ))}
         <svg className="absolute inset-0 w-full h-full opacity-10 animate-spin-slow" viewBox="0 0 400 400">
-          <circle cx="200" cy="200" r="180" fill="none" stroke="#3ea6ff" strokeWidth="0.5" strokeDasharray="4 8" />
+          <circle cx="200" cy="200" r="180" fill="none" stroke="#d1ff45" strokeWidth="0.5" strokeDasharray="4 8" />
           <circle cx="200" cy="200" r="140" fill="none" stroke="#2ee6a8" strokeWidth="0.5" strokeDasharray="2 12" />
-          <circle cx="200" cy="200" r="100" fill="none" stroke="#3ea6ff" strokeWidth="0.5" />
+          <circle cx="200" cy="200" r="100" fill="none" stroke="#d1ff45" strokeWidth="0.5" />
         </svg>
       </div>
 

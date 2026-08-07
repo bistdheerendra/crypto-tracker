@@ -206,7 +206,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={triggerTapFeedback}
                 className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg transition-colors ${
                   active
-                    ? "text-accent bg-accent/10 scale-[1.02] shadow-[0_0_0_1px_rgba(62,166,255,0.25)]"
+                    ? "text-accent bg-accent/10 scale-[1.02] shadow-[0_0_0_1px_rgba(209,255,69,0.25)]"
                     : "text-text-muted hover:text-text-primary hover:bg-white/5 active:scale-95"
                 }`}
               >

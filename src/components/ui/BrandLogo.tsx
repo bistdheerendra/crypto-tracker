@@ -24,7 +24,7 @@ const SIZE = {
 function LogoMark({ size, gradId }: { size: number; gradId: string }) {
   return (
     <div
-      className="relative shrink-0 rounded-[10px] p-[1px] bg-gradient-to-br from-accent/80 via-accent/30 to-bull/50 shadow-[0_0_20px_rgba(62,166,255,0.25)]"
+      className="relative shrink-0 rounded-[10px] p-[1px] bg-gradient-to-br from-accent/80 via-accent/30 to-bull/50 shadow-[0_0_20px_rgba(209,255,69,0.25)]"
       style={{ width: size, height: size }}
       aria-hidden
     >
@@ -32,7 +32,7 @@ function LogoMark({ size, gradId }: { size: number; gradId: string }) {
         <svg viewBox="0 0 32 32" className="w-[68%] h-[68%]" fill="none">
           <defs>
             <linearGradient id={gradId} x1="4" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#3ea6ff" />
+              <stop stopColor="#d1ff45" />
               <stop offset="1" stopColor="#2ee6a8" />
             </linearGradient>
           </defs>
@@ -57,7 +57,7 @@ function LogoMark({ size, gradId }: { size: number; gradId: string }) {
             opacity="0.5"
           />
           <circle cx="16" cy="16" r="2.25" fill={`url(#${gradId})`} />
-          <circle cx="16" cy="16" r="5" stroke="#3ea6ff" strokeOpacity="0.25" strokeWidth="0.75" />
+          <circle cx="16" cy="16" r="5" stroke="#d1ff45" strokeOpacity="0.25" strokeWidth="0.75" />
         </svg>
       </div>
     </div>

@@ -139,7 +139,7 @@ export default function DashboardPage() {
           {!loadingVerdicts && verdicts.map((v) => {
             const regime = regimes[v.pair];
             return (
-            <GlassCard key={v.pair} className="mb-3" glow="accent">
+            <GlassCard key={v.pair} className="mb-3">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                 <span className="font-mono-data font-semibold text-sm sm:text-base">{v.pair} · {v.timeframe}</span>
                 <TierPill tier={v.tier} />

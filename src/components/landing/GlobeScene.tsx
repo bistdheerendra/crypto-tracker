@@ -58,7 +58,7 @@ function createGrid(radius: number) {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   return new THREE.LineSegments(
     geometry,
-    new THREE.LineBasicMaterial({ color: 0x3ea6ff, transparent: true, opacity: 0.1 })
+    new THREE.LineBasicMaterial({ color: 0xd1ff45, transparent: true, opacity: 0.1 })
   );
 }
 

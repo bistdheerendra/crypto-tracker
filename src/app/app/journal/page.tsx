@@ -198,7 +198,7 @@ export default function JournalPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <GlassCard glow="accent">
+            <GlassCard>
               <p className="text-xs text-text-muted uppercase tracking-wider mb-2">
                 Your win rate
               </p>

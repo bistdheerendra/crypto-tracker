@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { BiasPill } from "@/components/ui/BiasPill";
 import { TierPill } from "@/components/ui/TierPill";
@@ -12,6 +13,8 @@ import { JournalTakenControl } from "@/components/journal/JournalTakenControl";
 import { useMarketRegime } from "@/components/regime/useMarketRegime";
 import { TRACKED_PAIRS, TRACKED_TIMEFRAMES } from "@/lib/market/constants";
 import type { LaneOutput, Verdict } from "@/lib/types";
+
+const Scanner = dynamic(() => import("@/components/ui/Scanner"), { ssr: false });
 
 const badgeColors: Record<string, string> = {
   T: "bg-accent/20 text-accent border-accent/30",
@@ -82,7 +85,43 @@ export default function AnalyzePage() {
   }, []);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="relative min-h-full">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[min(52vh,520px)] overflow-hidden"
+        aria-hidden
+      >
+        <Scanner
+          color1="#090c1b"
+          color2="#d1ff45"
+          color3="#000000"
+          speed={0.35}
+          sweepSpeed={0.3}
+          sweepWidth={3.3}
+          sweepFalloff={6}
+          scale={0.8}
+          frequency={1.95}
+          ripple={0.2}
+          bandDensity={11}
+          lineSharpness={5.5}
+          glow={0.22}
+          scanDirection="vertical"
+          colorSpread={0.49}
+          brightness={1.0}
+          contrast={1.15}
+          softness={2.15}
+          vignette={0.45}
+          scanline
+          grain
+          grainIntensity={0.05}
+          opacity={0.85}
+          mouseInteraction={false}
+          mouseRadius={0.65}
+          mouseStrength={0.5}
+        />
+        <div className="absolute inset-0 bg-linear-to-b from-bg-primary/20 via-transparent to-bg-primary" />
+      </div>
+
+      <div className="relative z-10 p-4 sm:p-6 lg:p-8">
       <h1 className="text-xl sm:text-2xl font-bold mb-1">Analyze</h1>
       <p className="text-text-muted text-sm mb-6 sm:mb-8">Run the 4-lane pipeline for any tracked pair.</p>
 
@@ -203,6 +242,7 @@ export default function AnalyzePage() {
           )}
         </GlassCard>
       )}
+      </div>
     </div>
   );
 }

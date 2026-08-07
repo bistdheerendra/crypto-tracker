@@ -359,7 +359,7 @@ export default function PortfolioPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent text-bg-primary hover:bg-accent/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Add Position
@@ -397,7 +397,7 @@ export default function PortfolioPage() {
             {loading ? "—" : formatUsd(summary.totalPortfolioValue)}
           </p>
         </GlassCard>
-        <GlassCard glow="accent">
+        <GlassCard>
           <p className="text-xs text-text-muted uppercase tracking-wider mb-2">Total P&amp;L</p>
           <p
             className={`font-mono-data text-2xl sm:text-3xl font-bold ${
@@ -926,7 +926,7 @@ export default function PortfolioPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-50 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent text-bg-primary hover:bg-accent/90 disabled:opacity-50 transition-colors"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editingId ? "Save changes" : "Add position"}
@@ -971,7 +971,7 @@ export default function PortfolioPage() {
                   }}
                   className={`min-h-11 px-2 py-2 rounded-lg text-xs border ${
                     closePercent === pct && closeQty === ""
-                      ? "bg-accent/20 border-accent/40 text-accent"
+                      ? "bg-accent border-accent text-bg-primary"
                       : "bg-white/5 border-white/10 text-text-muted"
                   }`}
                 >
@@ -997,7 +997,7 @@ export default function PortfolioPage() {
               type="button"
               onClick={() => void submitClose()}
               disabled={closing}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 disabled:opacity-50 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-accent text-bg-primary hover:bg-accent/90 disabled:opacity-50 transition-colors"
             >
               {closing && <Loader2 className="w-4 h-4 animate-spin" />}
               Confirm close

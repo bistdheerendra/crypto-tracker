@@ -51,7 +51,7 @@ const TRADE_LINES: {
   color: string;
   lineStyle: LineStyle;
 }[] = [
-  { key: "entry", title: "Entry", color: "#3ea6ff", lineStyle: LineStyle.Solid },
+  { key: "entry", title: "Entry", color: "#d1ff45", lineStyle: LineStyle.Solid },
   { key: "stopLoss", title: "SL", color: "#ff5c72", lineStyle: LineStyle.Dashed },
   { key: "takeProfit1", title: "TP1", color: "#2ee6a8", lineStyle: LineStyle.Dotted },
   { key: "takeProfit2", title: "TP2", color: "#2ee6a8", lineStyle: LineStyle.SparseDotted },
@@ -168,8 +168,8 @@ export function LiveCandleChart({
         horzLines: { color: "rgba(255,255,255,0.05)" },
       },
       crosshair: {
-        vertLine: { color: "rgba(62,166,255,0.4)" },
-        horzLine: { color: "rgba(62,166,255,0.4)" },
+        vertLine: { color: "rgba(209,255,69,0.4)" },
+        horzLine: { color: "rgba(209,255,69,0.4)" },
       },
       timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
       rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
