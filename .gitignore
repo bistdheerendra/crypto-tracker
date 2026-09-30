@@ -48,12 +48,12 @@ next-env.d.ts
 # generated ML datasets
 /ml/data/
 
-# trained model artifacts (keep ONNX + sidecars for Vercel Node inference)
+# trained model artifacts (keep ONNX + sidecars for Node inference)
 /ml/models/*
 !/ml/models/baseline_classifier.onnx
 !/ml/models/feature_medians.json
 !/ml/models/feature_columns.json
 !/ml/models/.gitkeep
 
-# onnxruntime-web WASM binaries (required for Vercel inference)
+# onnxruntime-web WASM binaries (required for Node inference)
 !/ml/ort-wasm/

@@ -1,8 +1,11 @@
 name: Frequent Dheerendra Intelligence crons
 
-# Vercel Hobby cron is daily-only. This workflow densifies track-record + alerts.
-# Secrets: CRON_BASE_URL (https://your-app.vercel.app), CRON_SECRET
-# Prefer cron-job.org for production; keep intervals aligned to limit Supabase egress.
+# Primary frequent scheduler. Calls whatever origin is in CRON_BASE_URL.
+# After the Render service is live, set CRON_BASE_URL to https://YOUR-SERVICE.onrender.com
+# (no trailing slash). Do not hard-code that host here.
+# vercel.json still cron-calls the Vercel deployment daily until that project is removed.
+# Do not also run cron-job.org against the same paths.
+# Secrets: CRON_BASE_URL, CRON_SECRET (must match the service that CRON_BASE_URL points at).
 
 on:
   schedule:
@@ -40,7 +43,7 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$CRON_BASE_URL" ]; then
-            echo "Missing secret CRON_BASE_URL — set to https://your-app.vercel.app"
+            echo "Missing secret CRON_BASE_URL — set to the Render origin, e.g. https://YOUR-SERVICE.onrender.com"
             exit 1
           fi
 

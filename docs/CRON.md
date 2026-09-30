@@ -29,10 +29,12 @@ Workflow: [`.github/workflows/frequent-cron.yml`](../.github/workflows/frequent-
 
 | Secret | Example |
 |--------|---------|
-| `CRON_BASE_URL` | `https://your-app.vercel.app` (no trailing slash) |
-| `CRON_SECRET` | same value as Vercel `CRON_SECRET` env |
+| `CRON_BASE_URL` | Render origin, e.g. `https://YOUR-SERVICE.onrender.com` (no trailing slash). This workflow does not hard-code the host. |
+| `CRON_SECRET` | same value as `CRON_SECRET` on that service |
 
 Enable Actions on the repo; the workflow runs on schedule automatically.
+
+Point `CRON_BASE_URL` at one origin only. Once the Render web service is the host you want these jobs to hit, set it to that Render URL. `vercel.json` still calls the Vercel deployment on its own daily schedule until that Vercel project is removed. Do not add cron-job.org for the same paths.
 
 ## Option B — cron-job.org
 

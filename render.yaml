@@ -1,0 +1,46 @@
+# Render Blueprint for a free Node.js web service.
+# Spec: https://render.com/docs/blueprint-spec
+# This file does not remove or replace vercel.json.
+services:
+  - type: web
+    name: crypto-tracker
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      # Node 22+ provides the global WebSocket used by server-side liquidation collection.
+      # Next.js 16 requires Node >= 20.9.
+      - key: NODE_VERSION
+        value: "22.14.0"
+      # Required. Set in the Render dashboard. Never commit values.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Required for cron auth. Must match the GitHub Actions secret of the same name.
+      - key: CRON_SECRET
+        sync: false
+      # Optional. Leave unset if you are not using that integration.
+      - key: SOSOVALUE_API_KEY
+        sync: false
+      - key: BLOCKCHAIR_API_KEY
+        sync: false
+      - key: WHALE_CAPTURE_ENABLED
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_GENERATIVE_AI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
