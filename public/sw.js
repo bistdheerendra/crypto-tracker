@@ -1,4 +1,14 @@
-const CACHE_NAME = "deepcurrent-v2";
+const CACHE_NAME = "deepcurrent-v3";
+
+function isAppRouterFlight(request, url) {
+  return (
+    url.searchParams.has("_rsc") ||
+    request.headers.get("RSC") === "1" ||
+    request.headers.has("Next-Router-Prefetch") ||
+    request.headers.has("Next-Router-State-Tree") ||
+    request.headers.has("Next-Router-Segment-Prefetch")
+  );
+}
 const OFFLINE_ASSETS = ["/", "/offline", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -29,6 +39,9 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
+  // Client navigations are fetch() calls, not document loads. A cached flight
+  // response makes the router stay on the current page (Sign in, Get started).
+  if (isAppRouterFlight(request, url)) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

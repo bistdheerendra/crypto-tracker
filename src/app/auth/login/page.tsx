@@ -2,18 +2,16 @@
 
 import Link from "next/link";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     localStorage.setItem("dc_auth", JSON.stringify({ email }));
-    router.push("/app/dashboard");
+    window.location.assign("/app/dashboard");
   }
 
   return (
